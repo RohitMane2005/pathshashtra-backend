@@ -1,0 +1,16 @@
+package com.pathshashtra.backend.study;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import java.util.List;
+
+public interface StudyTopicRepository extends JpaRepository<StudyTopic, Long> {
+    List<StudyTopic> findByStudyPlanId(Long planId);
+    List<StudyTopic> findByStudyPlanIdAndIsWeak(Long planId, boolean isWeak);
+    List<StudyTopic> findByStudyPlanIdAndSubject(Long planId, String subject);
+    List<StudyTopic> findByStudyPlanIdAndWeekNumberAndDayNumber(Long planId, int week, int day);
+
+    @Query("SELECT t.subject, COUNT(t), SUM(CASE WHEN t.status = 'COMPLETED' THEN 1 ELSE 0 END) " +
+            "FROM StudyTopic t WHERE t.studyPlan.id = :planId GROUP BY t.subject")
+    List<Object[]> getProgressBySubject(Long planId);
+}
