@@ -19,27 +19,34 @@ public class CorsConfig {
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(List.of(
+        // FIX: Use ONLY setAllowedOriginPatterns.
+        // Mixing setAllowedOrigins + setAllowedOriginPatterns causes Spring to
+        // ignore one of the lists depending on request origin, making CORS policy
+        // unpredictable and potentially bypassed for some origins.
+        // setAllowedOriginPatterns supports exact strings AND wildcards and
+        // is fully compatible with allowCredentials(true).
+        config.setAllowedOriginPatterns(List.of(
                 "http://localhost:3000",
                 "http://localhost:5173",
+                "http://localhost:*",
+                "https://*.vercel.app",
                 frontendUrl
         ));
 
-        // Also allow any vercel.app subdomain
-        config.setAllowedOriginPatterns(List.of(
-                "https://*.vercel.app",
-                "http://localhost:*"
-        ));
-
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setExposedHeaders(List.of("Authorization"));
+
+        // Explicit header allowlist — no wildcard
+        config.setAllowedHeaders(List.of(
+                "Authorization", "Content-Type", "Accept", "X-Requested-With"
+        ));
+        config.setExposedHeaders(List.of(
+                "Authorization", "X-RateLimit-Remaining", "X-RateLimit-Limit"
+        ));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
-
         return new CorsFilter(source);
     }
 }

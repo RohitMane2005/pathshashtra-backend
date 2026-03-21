@@ -2,6 +2,7 @@ package com.pathshashtra.backend.coding;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pathshashtra.backend.common.JsonCleaner;
 import com.pathshashtra.backend.profile.UserProfileRepository;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
@@ -17,25 +18,27 @@ public class CodingService {
     private final UserRepository userRepository;
     private final UserProfileRepository profileRepository;
     private final GrokCodingService grokCodingService;
+    private final JsonCleaner jsonCleaner;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public CodingService(CodingProblemRepository problemRepository,
                          UserRepository userRepository,
                          UserProfileRepository profileRepository,
-                         GrokCodingService grokCodingService) {
+                         GrokCodingService grokCodingService,
+                         JsonCleaner jsonCleaner) {
         this.problemRepository = problemRepository;
         this.userRepository = userRepository;
         this.profileRepository = profileRepository;
         this.grokCodingService = grokCodingService;
+        this.jsonCleaner = jsonCleaner;
     }
 
     public Map<String, Object> generateProblem(String email, ProblemGenerateRequest request) {
         User user = getUser(email);
-
         String problemJson = grokCodingService.generateProblem(
                 request.getTopic(), request.getDifficulty(), request.getLanguage());
-
-        String title = extractField(problemJson, "title", "DSA Problem");
+        String cleaned = jsonCleaner.clean(problemJson);
+        String title = extractField(cleaned, "title", "DSA Problem");
 
         CodingProblem problem = new CodingProblem();
         problem.setUser(user);
@@ -43,19 +46,18 @@ public class CodingService {
         problem.setDifficulty(request.getDifficulty());
         problem.setLanguage(request.getLanguage());
         problem.setProblemTitle(title);
-        problem.setProblemJson(problemJson);
+        problem.setProblemJson(cleaned);
         problem.setStatus(CodingProblem.ProblemStatus.GENERATED);
         problemRepository.save(problem);
 
         Map<String, Object> response = new HashMap<>();
         response.put("problemId", problem.getId());
-        response.put("problem", parseJson(problemJson));
+        response.put("problem", parseJson(cleaned));
         return response;
     }
 
     public Map<String, Object> getHint(String email, HintRequest request) {
         User user = getUser(email);
-
         CodingProblem problem = problemRepository
                 .findByIdAndUserId(request.getProblemId(), user.getId())
                 .orElseThrow(() -> new RuntimeException("Problem not found"));
@@ -79,41 +81,35 @@ public class CodingService {
         Map<String, Object> response = new HashMap<>();
         response.put("hintsUsed", problem.getHintsUsed());
         response.put("hintsRemaining", 3 - problem.getHintsUsed());
-        response.put("hint", parseJson(hintJson));
+        response.put("hint", parseJson(jsonCleaner.clean(hintJson)));
         return response;
     }
 
     public CodeFeedback submitCode(String email, CodeSubmitRequest request) {
         User user = getUser(email);
-
         CodingProblem problem = problemRepository
                 .findByIdAndUserId(request.getProblemId(), user.getId())
                 .orElseThrow(() -> new RuntimeException("Problem not found"));
 
         String feedbackJson = grokCodingService.reviewCode(
-                problem.getProblemJson(),
-                request.getCode(),
-                request.getLanguage()
-        );
+                problem.getProblemJson(), request.getCode(), request.getLanguage());
 
         problem.setSubmittedCode(request.getCode());
         problem.setFeedbackJson(feedbackJson);
         problem.setStatus(CodingProblem.ProblemStatus.REVIEWED);
 
-        CodeFeedback feedback = parseFeedback(feedbackJson);
+        CodeFeedback feedback = parseFeedback(jsonCleaner.clean(feedbackJson));
         if (feedback.isCorrect()) {
             problem.setStatus(CodingProblem.ProblemStatus.SOLVED);
             problem.setSolvedAt(LocalDateTime.now());
         }
         problemRepository.save(problem);
-
         return feedback;
     }
 
     public List<Map<String, Object>> getMyProblems(String email) {
         User user = getUser(email);
-        List<CodingProblem> problems = problemRepository
-                .findByUserIdOrderByCreatedAtDesc(user.getId());
+        List<CodingProblem> problems = problemRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (CodingProblem p : problems) {
@@ -133,17 +129,14 @@ public class CodingService {
 
     public Map<String, Object> getDsaRoadmap(String email, String targetGoal) {
         User user = getUser(email);
-
         final String[] level = {"Beginner"};
         profileRepository.findByUserId(user.getId()).ifPresent(p -> {
             if (p.getExperienceLevel() != null) level[0] = p.getExperienceLevel();
         });
 
-        String roadmapJson = grokCodingService.generateRoadmap(
-                user.getName(), level[0], targetGoal);
-
+        String roadmapJson = grokCodingService.generateRoadmap(user.getName(), level[0], targetGoal);
         Map<String, Object> response = new HashMap<>();
-        response.put("roadmap", parseJson(roadmapJson));
+        response.put("roadmap", parseJson(jsonCleaner.clean(roadmapJson)));
         return response;
     }
 
@@ -154,10 +147,7 @@ public class CodingService {
 
     private String extractField(String json, String field, String defaultValue) {
         try {
-            String clean = json.replaceAll("```json", "").replaceAll("```", "").trim();
-            int start = clean.indexOf('{');
-            if (start > 0) clean = clean.substring(start);
-            return objectMapper.readTree(clean).path(field).asText(defaultValue);
+            return objectMapper.readTree(json).path(field).asText(defaultValue);
         } catch (Exception e) {
             return defaultValue;
         }
@@ -165,10 +155,7 @@ public class CodingService {
 
     private Object parseJson(String json) {
         try {
-            String clean = json.replaceAll("```json", "").replaceAll("```", "").trim();
-            int start = clean.indexOf('{');
-            if (start > 0) clean = clean.substring(start);
-            return objectMapper.readTree(clean);
+            return objectMapper.readTree(json);
         } catch (Exception e) {
             return json;
         }
@@ -176,15 +163,10 @@ public class CodingService {
 
     private CodeFeedback parseFeedback(String json) {
         try {
-            String clean = json.replaceAll("```json", "").replaceAll("```", "").trim();
-            int start = clean.indexOf('{');
-            if (start > 0) clean = clean.substring(start);
-            JsonNode root = objectMapper.readTree(clean);
-
+            JsonNode root = objectMapper.readTree(json);
             List<String> strengths = new ArrayList<>();
             List<String> improvements = new ArrayList<>();
             List<String> bugs = new ArrayList<>();
-
             for (JsonNode s : root.path("strengths")) strengths.add(s.asText());
             for (JsonNode i : root.path("improvements")) improvements.add(i.asText());
             for (JsonNode b : root.path("bugs")) bugs.add(b.asText());
@@ -193,9 +175,7 @@ public class CodingService {
                     .isCorrect(root.path("isCorrect").asBoolean())
                     .score(root.path("score").asInt())
                     .overallFeedback(root.path("overallFeedback").asText())
-                    .strengths(strengths)
-                    .improvements(improvements)
-                    .bugs(bugs)
+                    .strengths(strengths).improvements(improvements).bugs(bugs)
                     .optimizedApproach(root.path("optimizedApproach").asText())
                     .timeComplexity(root.path("timeComplexity").asText())
                     .spaceComplexity(root.path("spaceComplexity").asText())

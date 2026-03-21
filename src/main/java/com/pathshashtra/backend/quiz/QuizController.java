@@ -1,50 +1,50 @@
 package com.pathshashtra.backend.quiz;
 
+import com.pathshashtra.backend.ratelimit.RateLimiter;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/quiz")
 public class QuizController {
 
     private final QuizService quizService;
+    private final RateLimiter rateLimiter;
 
-    public QuizController(QuizService quizService) {
+    public QuizController(QuizService quizService, RateLimiter rateLimiter) {
         this.quizService = quizService;
+        this.rateLimiter = rateLimiter;
     }
 
-    // POST /api/quiz/start → Claude generates 10 questions
     @PostMapping("/start")
-    public ResponseEntity<QuizStartResponse> startQuiz(Authentication auth) {
-        QuizStartResponse response = quizService.startQuiz(auth.getName());
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> startQuiz(Authentication auth) {
+        String email = auth.getName();
+        if (!rateLimiter.allowQuizStart(email)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "Daily limit reached. You can start up to 3 quizzes per day."));
+        }
+        return ResponseEntity.ok()
+                .header("X-RateLimit-Remaining", String.valueOf(rateLimiter.remaining("ai_quiz:", email, 3)))
+                .body(quizService.startQuiz(email));
     }
 
-    // POST /api/quiz/submit → Claude analyzes answers, returns full result
     @PostMapping("/submit")
-    public ResponseEntity<QuizResult> submitQuiz(
-            @RequestBody QuizSubmitRequest request,
-            Authentication auth) {
-        QuizResult result = quizService.submitQuiz(auth.getName(), request);
-        return ResponseEntity.ok(result);
+    public ResponseEntity<QuizResult> submitQuiz(@RequestBody QuizSubmitRequest request, Authentication auth) {
+        return ResponseEntity.ok(quizService.submitQuiz(auth.getName(), request));
     }
 
-    // GET /api/quiz/results → list all past quiz results
     @GetMapping("/results")
     public ResponseEntity<List<QuizResultSummary>> getMyResults(Authentication auth) {
-        List<QuizResultSummary> results = quizService.getMyResults(auth.getName());
-        return ResponseEntity.ok(results);
+        return ResponseEntity.ok(quizService.getMyResults(auth.getName()));
     }
 
-    // GET /api/quiz/results/{sessionId} → get one full result
     @GetMapping("/results/{sessionId}")
-    public ResponseEntity<QuizResult> getResult(
-            @PathVariable Long sessionId,
-            Authentication auth) {
-        QuizResult result = quizService.getResult(auth.getName(), sessionId);
-        return ResponseEntity.ok(result);
+    public ResponseEntity<QuizResult> getResult(@PathVariable Long sessionId, Authentication auth) {
+        return ResponseEntity.ok(quizService.getResult(auth.getName(), sessionId));
     }
 }

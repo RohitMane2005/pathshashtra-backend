@@ -4,14 +4,19 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtUtil jwtUtil;
 
@@ -22,8 +27,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        // Skip JWT check for public endpoints
-        return path.startsWith("/api/auth") || path.equals("/api/health");
+        return path.startsWith("/api/auth") || path.equals("/api/health") || path.startsWith("/actuator");
     }
 
     @Override
@@ -34,38 +38,48 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String header = request.getHeader("Authorization");
 
-        if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7).trim();
+        // FIX: No Authorization header — do NOT set authentication.
+        // Spring Security's .anyRequest().authenticated() will then reject the request
+        // with 401 via the HttpStatusEntryPoint configured in SecurityConfig.
+        // Previously this was already handled correctly by Spring Security, but
+        // making it explicit here prevents any future misconfiguration bypassing it.
+        if (header == null || !header.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
-            if (!token.isEmpty()) {
-                try {
-                    if (jwtUtil.isTokenValid(token)) {
-                        String email = jwtUtil.extractEmail(token);
+        String token = header.substring(7).trim();
 
-                        UsernamePasswordAuthenticationToken authentication =
-                                new UsernamePasswordAuthenticationToken(
-                                        email,
-                                        null,
-                                        Collections.emptyList()
-                                );
+        if (token.isEmpty()) {
+            sendUnauthorized(response, "Missing token");
+            return;
+        }
 
-                        SecurityContextHolder.getContext().setAuthentication(authentication);
-                    } else {
-                        // Token expired — return 401
-                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                        response.setContentType("application/json");
-                        response.getWriter().write("{\"error\":\"Token expired\",\"status\":401}");
-                        return;
-                    }
-                } catch (Exception e) {
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.setContentType("application/json");
-                    response.getWriter().write("{\"error\":\"Invalid token\",\"status\":401}");
-                    return;
-                }
+        try {
+            if (jwtUtil.isTokenValid(token)) {
+                String email = jwtUtil.extractEmail(token);
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                email, null, Collections.emptyList());
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else {
+                log.debug("Rejected expired JWT for {}", request.getServletPath());
+                sendUnauthorized(response, "Token expired");
+                return;
             }
+        } catch (Exception e) {
+            log.debug("Invalid JWT: {}", e.getMessage());
+            sendUnauthorized(response, "Invalid token");
+            return;
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.getWriter().write("{\"error\":\"" + message + "\",\"status\":401}");
     }
 }

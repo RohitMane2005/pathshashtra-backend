@@ -1,35 +1,24 @@
 package com.pathshashtra.backend.coding;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import com.pathshashtra.backend.common.GroqClient;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-import java.util.*;
 
 @Service
 public class GrokCodingService {
 
-    @Value("${groq.api.key}")
-    private String apiKey;
+    private final GroqClient groqClient;
 
-    @Value("${groq.api.url:https://api.groq.com/openai/v1/chat/completions}")
-    private String apiUrl;
-
-    @Value("${groq.model:llama-3.3-70b-versatile}")
-    private String model;
-
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    public GrokCodingService(GroqClient groqClient) {
+        this.groqClient = groqClient;
+    }
 
     public String generateProblem(String topic, String difficulty, String language) {
         String prompt = """
                 You are an expert DSA coding tutor for Indian college students preparing for placements and GATE.
-                
+
                 Generate a %s difficulty DSA problem on topic: %s
                 Target language: %s
-                
+
                 Respond ONLY with valid JSON, no extra text:
                 {
                   "title": "Problem title",
@@ -54,26 +43,26 @@ public class GrokCodingService {
                 }
                 """.formatted(difficulty, topic, language, topic, difficulty, language);
 
-        return callGroq(prompt);
+        return groqClient.call(prompt, 2000);
     }
 
     public String generateHint(String problemJson, String currentCode, int hintsUsed) {
         String prompt = """
                 You are a coding tutor helping a student solve a DSA problem.
-                
+
                 Problem:
                 %s
-                
+
                 Student's current code (may be empty if just started):
                 %s
-                
+
                 Hints already given: %d
-                
+
                 Give hint number %d. Be progressive:
                 - Hint 1: High-level approach/algorithm to use
                 - Hint 2: Key data structure or technique needed
                 - Hint 3: Specific implementation detail
-                
+
                 Respond ONLY with valid JSON:
                 {
                   "hintNumber": %d,
@@ -83,21 +72,21 @@ public class GrokCodingService {
                 """.formatted(problemJson, currentCode.isEmpty() ? "Not started yet" : currentCode,
                 hintsUsed, hintsUsed + 1, hintsUsed + 1);
 
-        return callGroq(prompt);
+        return groqClient.call(prompt, 500);
     }
 
     public String reviewCode(String problemJson, String submittedCode, String language) {
         String prompt = """
                 You are an expert code reviewer and DSA tutor for Indian college students.
-                
+
                 Problem:
                 %s
-                
+
                 Student's %s Solution:
                 %s
-                
+
                 Review this solution thoroughly.
-                
+
                 Respond ONLY with valid JSON, no extra text:
                 {
                   "isCorrect": true,
@@ -114,19 +103,19 @@ public class GrokCodingService {
                 }
                 """.formatted(problemJson, language, submittedCode);
 
-        return callGroq(prompt);
+        return groqClient.call(prompt, 2000);
     }
 
     public String generateRoadmap(String studentName, String currentLevel, String targetGoal) {
         String prompt = """
                 You are an expert DSA mentor for Indian college students.
-                
+
                 Student: %s
                 Current Level: %s
                 Target Goal: %s
-                
+
                 Create a concise personalized DSA learning roadmap.
-                
+
                 Respond ONLY with valid JSON, no extra text:
                 {
                   "roadmapTitle": "Title",
@@ -147,38 +136,6 @@ public class GrokCodingService {
                 }
                 """.formatted(studentName, currentLevel, targetGoal);
 
-        return callGroq(prompt);
-    }
-
-    private String callGroq(String prompt) {
-        try {
-            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-            factory.setConnectTimeout(30000);
-            factory.setReadTimeout(60000);
-            RestTemplate restTemplate = new RestTemplate(factory);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
-
-            Map<String, Object> message = Map.of("role", "user", "content", prompt);
-
-            Map<String, Object> body = new HashMap<>();
-            body.put("model", model);
-            body.put("max_tokens", 2000);
-            body.put("messages", List.of(message));
-
-            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-            ResponseEntity<String> response = restTemplate.exchange(
-                    apiUrl, HttpMethod.POST, request, String.class
-            );
-
-            JsonNode root = objectMapper.readTree(response.getBody());
-            return root.path("choices").get(0)
-                    .path("message").path("content").asText();
-
-        } catch (Exception e) {
-            throw new RuntimeException("Groq API call failed: " + e.getMessage());
-        }
+        return groqClient.call(prompt, 2000);
     }
 }

@@ -14,21 +14,20 @@ public class UserProfileController {
         this.service = service;
     }
 
-    // Save or update profile for logged-in user
     @PostMapping
     public ResponseEntity<UserProfile> saveProfile(
-            @RequestBody UserProfile profile,
+            @RequestBody UserProfileRequest request,
             Authentication authentication) {
-        String email = authentication.getName();
-        UserProfile saved = service.saveProfile(email, profile);
-        return ResponseEntity.ok(saved);
+        return ResponseEntity.ok(service.saveProfile(authentication.getName(), request));
     }
 
-    // Get profile for logged-in user
     @GetMapping("/me")
     public ResponseEntity<UserProfile> getProfile(Authentication authentication) {
-        String email = authentication.getName();
-        UserProfile profile = service.getProfile(email);
-        return ResponseEntity.ok(profile);
+        try {
+            return ResponseEntity.ok(service.getProfile(authentication.getName()));
+        } catch (RuntimeException e) {
+            // Profile not yet created — return empty 204 instead of 404 error
+            return ResponseEntity.noContent().build();
+        }
     }
 }

@@ -1,6 +1,8 @@
 package com.pathshashtra.backend.roadmap;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.pathshashtra.backend.ratelimit.RateLimiter;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -13,36 +15,33 @@ import java.util.Map;
 public class RoadmapController {
 
     private final RoadmapService roadmapService;
+    private final RateLimiter rateLimiter;
 
-    public RoadmapController(RoadmapService roadmapService) {
+    public RoadmapController(RoadmapService roadmapService, RateLimiter rateLimiter) {
         this.roadmapService = roadmapService;
+        this.rateLimiter = rateLimiter;
     }
 
-    // Generate a new roadmap
     @PostMapping("/generate")
-    public ResponseEntity<JsonNode> generateRoadmap(
-            @RequestBody RoadmapRequest request,
-            Authentication authentication) {
-        String email = authentication.getName();
+    public ResponseEntity<?> generateRoadmap(@RequestBody RoadmapRequest request, Authentication auth) {
+        String email = auth.getName();
+        if (!rateLimiter.allowRoadmapGenerate(email)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "Daily limit reached. You can generate up to 5 roadmaps per day."));
+        }
         JsonNode roadmap = roadmapService.generateRoadmap(request, email);
-        return ResponseEntity.ok(roadmap);
+        return ResponseEntity.ok()
+                .header("X-RateLimit-Remaining", String.valueOf(rateLimiter.remaining("ai_roadmap:", email, 5)))
+                .body(roadmap);
     }
 
-    // Get all roadmaps for current user
     @GetMapping("/my")
-    public ResponseEntity<List<Roadmap>> getMyRoadmaps(Authentication authentication) {
-        String email = authentication.getName();
-        List<Roadmap> roadmaps = roadmapService.getUserRoadmaps(email);
-        return ResponseEntity.ok(roadmaps);
+    public ResponseEntity<List<Roadmap>> getMyRoadmaps(Authentication auth) {
+        return ResponseEntity.ok(roadmapService.getUserRoadmaps(auth.getName()));
     }
 
-    // Get a specific roadmap by ID
     @GetMapping("/{id}")
-    public ResponseEntity<JsonNode> getRoadmap(
-            @PathVariable Long id,
-            Authentication authentication) {
-        String email = authentication.getName();
-        JsonNode roadmap = roadmapService.getRoadmapById(id, email);
-        return ResponseEntity.ok(roadmap);
+    public ResponseEntity<JsonNode> getRoadmap(@PathVariable Long id, Authentication auth) {
+        return ResponseEntity.ok(roadmapService.getRoadmapById(id, auth.getName()));
     }
 }

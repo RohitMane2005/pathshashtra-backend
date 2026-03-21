@@ -15,7 +15,7 @@
 
 	<groupId>com.pathshashtra</groupId>
 	<artifactId>backend</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<name>pathshashtra-backend</name>
 	<description>PathShashtra AI Career Guidance Backend</description>
 
@@ -55,12 +55,6 @@
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 
-		<!-- Email -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-mail</artifactId>
-		</dependency>
-
 		<!-- PostgreSQL -->
 		<dependency>
 			<groupId>org.postgresql</groupId>
@@ -74,13 +68,6 @@
 			<artifactId>lombok</artifactId>
 			<version>1.18.36</version>
 			<optional>true</optional>
-		</dependency>
-
-		<!-- DevTools (Hot reload) -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-devtools</artifactId>
-			<scope>runtime</scope>
 		</dependency>
 
 		<!-- Testing -->

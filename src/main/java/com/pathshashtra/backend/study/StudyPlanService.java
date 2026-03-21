@@ -2,8 +2,11 @@ package com.pathshashtra.backend.study;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pathshashtra.backend.common.JsonCleaner;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -13,20 +16,25 @@ import java.util.*;
 @Service
 public class StudyPlanService {
 
+    private static final Logger log = LoggerFactory.getLogger(StudyPlanService.class);
+
     private final StudyPlanRepository planRepository;
     private final StudyTopicRepository topicRepository;
     private final UserRepository userRepository;
     private final GrokStudyPlanService grokService;
+    private final JsonCleaner jsonCleaner;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public StudyPlanService(StudyPlanRepository planRepository,
                             StudyTopicRepository topicRepository,
                             UserRepository userRepository,
-                            GrokStudyPlanService grokService) {
+                            GrokStudyPlanService grokService,
+                            JsonCleaner jsonCleaner) {
         this.planRepository = planRepository;
         this.topicRepository = topicRepository;
         this.userRepository = userRepository;
         this.grokService = grokService;
+        this.jsonCleaner = jsonCleaner;
     }
 
     public StudyPlan generatePlan(String email, StudyPlanRequest request) {
@@ -51,9 +59,7 @@ public class StudyPlanService {
         plan.setStatus(StudyPlan.PlanStatus.ACTIVE);
         planRepository.save(plan);
 
-        // Save topics to DB
         saveTopicsFromPlan(plan, planJson);
-
         return plan;
     }
 
@@ -68,15 +74,10 @@ public class StudyPlanService {
         response.put("planTitle", plan.getPlanTitle());
         response.put("examDate", plan.getExamDate());
         response.put("startDate", plan.getStartDate());
-        response.put("daysUntilExam",
-                ChronoUnit.DAYS.between(LocalDate.now(), plan.getExamDate()));
+        response.put("daysUntilExam", ChronoUnit.DAYS.between(LocalDate.now(), plan.getExamDate()));
 
         try {
-            String clean = plan.getPlanJson()
-                    .replaceAll("```json", "").replaceAll("```", "").trim();
-            int jsonStart = clean.indexOf('{');
-            if (jsonStart > 0) clean = clean.substring(jsonStart);
-            response.put("plan", objectMapper.readTree(clean));
+            response.put("plan", objectMapper.readTree(jsonCleaner.clean(plan.getPlanJson())));
         } catch (Exception e) {
             response.put("plan", plan.getPlanJson());
         }
@@ -94,10 +95,8 @@ public class StudyPlanService {
         int weekNumber = (int) Math.ceil(daysSinceStart / 7.0);
         int dayNumber = (int) (daysSinceStart % 7 == 0 ? 7 : daysSinceStart % 7);
 
-        System.out.println("📅 Today = Day " + daysSinceStart + " → Week " + weekNumber + ", Day " + dayNumber);
-
-        return topicRepository.findByStudyPlanIdAndWeekNumberAndDayNumber(
-                plan.getId(), weekNumber, dayNumber);
+        log.debug("Today = Day {} → Week {}, Day {}", daysSinceStart, weekNumber, dayNumber);
+        return topicRepository.findByStudyPlanIdAndWeekNumberAndDayNumber(plan.getId(), weekNumber, dayNumber);
     }
 
     public StudyTopic updateTopicProgress(String email, TopicProgressRequest request) {
@@ -124,7 +123,6 @@ public class StudyPlanService {
         StudyPlan plan = planRepository
                 .findByUserIdAndStatus(user.getId(), StudyPlan.PlanStatus.ACTIVE)
                 .orElseThrow(() -> new RuntimeException("No active study plan found"));
-
         return topicRepository.findByStudyPlanIdAndIsWeak(plan.getId(), true);
     }
 
@@ -147,15 +145,13 @@ public class StudyPlanService {
             int subTotal = ((Long) row[1]).intValue();
             int subCompleted = ((Long) row[2]).intValue();
             int subPercent = subTotal == 0 ? 0 : (subCompleted * 100) / subTotal;
-            subjectProgress.add(new StudyProgressResponse.SubjectProgress(
-                    subject, subTotal, subCompleted, subPercent));
+            subjectProgress.add(new StudyProgressResponse.SubjectProgress(subject, subTotal, subCompleted, subPercent));
         }
 
         int weakCount = (int) allTopics.stream().filter(StudyTopic::isWeak).count();
         long daysUntilExam = ChronoUnit.DAYS.between(LocalDate.now(), plan.getExamDate());
 
-        return new StudyProgressResponse(
-                total, completed, overallPercent, subjectProgress, weakCount, daysUntilExam);
+        return new StudyProgressResponse(total, completed, overallPercent, subjectProgress, weakCount, daysUntilExam);
     }
 
     private User getUser(String email) {
@@ -165,16 +161,11 @@ public class StudyPlanService {
 
     private void saveTopicsFromPlan(StudyPlan plan, String planJson) {
         try {
-            // Clean JSON string
-            String clean = planJson.replaceAll("```json", "").replaceAll("```", "").trim();
-            int jsonStart = clean.indexOf('{');
-            if (jsonStart > 0) clean = clean.substring(jsonStart);
-
-            JsonNode root = objectMapper.readTree(clean);
+            JsonNode root = objectMapper.readTree(jsonCleaner.clean(planJson));
             JsonNode subjectsNode = root.path("subjects");
 
             if (subjectsNode.isMissingNode() || !subjectsNode.isArray()) {
-                System.out.println("❌ No subjects array found in plan JSON");
+                log.warn("No subjects array found in plan JSON for plan {}", plan.getId());
                 return;
             }
 
@@ -183,13 +174,11 @@ public class StudyPlanService {
             for (JsonNode subject : subjectsNode) {
                 String subjectName = subject.path("name").asText();
                 JsonNode weeklyTopics = subject.path("weeklyTopics");
-
                 if (weeklyTopics.isMissingNode() || !weeklyTopics.isArray()) continue;
 
                 for (JsonNode weekNode : weeklyTopics) {
                     int week = weekNode.path("week").asInt();
                     JsonNode topics = weekNode.path("topics");
-
                     if (topics.isMissingNode() || !topics.isArray()) continue;
 
                     for (JsonNode topicNode : topics) {
@@ -208,11 +197,10 @@ public class StudyPlanService {
             }
 
             topicRepository.saveAll(topicsToSave);
-            System.out.println("✅ Saved " + topicsToSave.size() + " topics to DB");
+            log.info("Saved {} topics for plan {}", topicsToSave.size(), plan.getId());
 
         } catch (Exception e) {
-            System.out.println("❌ Error saving topics: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error saving topics for plan {}: {}", plan.getId(), e.getMessage());
         }
     }
 }

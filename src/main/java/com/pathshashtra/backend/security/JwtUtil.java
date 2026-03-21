@@ -17,7 +17,21 @@ public class JwtUtil {
     public JwtUtil(
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.expiration}") long expiration) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes());
+
+        // FIX: Enforce minimum secret length at startup.
+        // HMAC-SHA256 requires >= 256 bits (32 bytes). A short secret is weak
+        // and jjwt will silently accept it, making tokens forgeable.
+        // 64 hex chars = 32 bytes = 256 bits minimum.
+        byte[] secretBytes = secret.getBytes();
+        if (secretBytes.length < 32) {
+            throw new IllegalArgumentException(
+                "JWT secret is too short (" + secretBytes.length + " bytes). " +
+                "Minimum 32 bytes (64 hex chars) required. " +
+                "Generate with: openssl rand -hex 64"
+            );
+        }
+
+        this.key = Keys.hmacShaKeyFor(secretBytes);
         this.expiration = expiration;
     }
 
