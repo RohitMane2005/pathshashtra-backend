@@ -59,6 +59,11 @@ public class CodingController {
                 .body(codingService.submitCode(email, request));
     }
 
+    @PostMapping("/problem/{id}/retry")
+    public ResponseEntity<?> retryProblem(@PathVariable Long id, Authentication auth) {
+        return ResponseEntity.ok(codingService.retryProblem(auth.getName(), id));
+    }
+
     @GetMapping("/problems")
     public ResponseEntity<List<Map<String, Object>>> getMyProblems(Authentication auth) {
         return ResponseEntity.ok(codingService.getMyProblems(auth.getName()));

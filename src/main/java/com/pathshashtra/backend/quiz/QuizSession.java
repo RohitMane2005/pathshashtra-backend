@@ -40,6 +40,10 @@ public class QuizSession {
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime completedAt;
 
+    /** URL-safe share token generated when quiz completes. Null until completed. */
+    @Column(unique = true)
+    private String shareToken;
+
     public enum QuizStatus {
         STARTED, COMPLETED
     }

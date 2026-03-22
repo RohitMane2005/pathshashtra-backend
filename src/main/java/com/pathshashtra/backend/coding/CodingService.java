@@ -137,6 +137,28 @@ public class CodingService {
         return new PageImpl<>(result, pageable, page.getTotalElements());
     }
 
+
+    /** Reset a problem so the user can attempt it again fresh. Clears code, feedback, hints. */
+    @Transactional
+    public Map<String, Object> retryProblem(String email, Long problemId) {
+        User user = getUser(email);
+        CodingProblem problem = problemRepository
+                .findByIdAndUserId(problemId, user.getId())
+                .orElseThrow(() -> new RuntimeException("Problem not found"));
+
+        problem.setSubmittedCode(null);
+        problem.setFeedbackJson(null);
+        problem.setHintsUsed(0);
+        problem.setStatus(CodingProblem.ProblemStatus.GENERATED);
+        problem.setSolvedAt(null);
+        problemRepository.save(problem);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("problemId", problem.getId());
+        response.put("problem", parseJson(problem.getProblemJson()));
+        return response;
+    }
+
     @Transactional
     public Map<String, Object> getDsaRoadmap(String email, String targetGoal) {
         User user = getUser(email);

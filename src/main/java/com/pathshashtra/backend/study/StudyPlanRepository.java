@@ -8,5 +8,6 @@ public interface StudyPlanRepository extends JpaRepository<StudyPlan, Long> {
     Optional<StudyPlan> findByUserIdAndStatus(Long userId, StudyPlan.PlanStatus status);
     List<StudyPlan> findByUserIdOrderByCreatedAtDesc(Long userId);
     Optional<StudyPlan> findByIdAndUserId(Long id, Long userId);
+    java.util.List<StudyPlan> findAllByStatus(StudyPlan.PlanStatus status);
     void deleteByUserId(Long userId);
 }

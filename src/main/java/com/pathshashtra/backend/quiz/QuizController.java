@@ -34,8 +34,8 @@ public class QuizController {
     }
 
     @PostMapping("/submit")
-    public ResponseEntity<QuizResult> submitQuiz(@RequestBody QuizSubmitRequest request, Authentication auth) {
-        return ResponseEntity.ok(quizService.submitQuiz(auth.getName(), request));
+    public ResponseEntity<?> submitQuiz(@RequestBody QuizSubmitRequest request, Authentication auth) {
+        return ResponseEntity.ok(quizService.submitQuizWithToken(auth.getName(), request));
     }
 
     @GetMapping("/results")
@@ -46,5 +46,11 @@ public class QuizController {
     @GetMapping("/results/{sessionId}")
     public ResponseEntity<QuizResult> getResult(@PathVariable Long sessionId, Authentication auth) {
         return ResponseEntity.ok(quizService.getResult(auth.getName(), sessionId));
+    }
+
+    /** Public endpoint — no auth needed, results accessible by share token. */
+    @GetMapping("/share/{token}")
+    public ResponseEntity<?> getSharedResult(@PathVariable String token) {
+        return ResponseEntity.ok(quizService.getPublicResult(token));
     }
 }

@@ -4,6 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -17,25 +18,33 @@ public class UserController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<User> getCurrentUser(Authentication authentication) {
-        return ResponseEntity.ok(userService.findByEmail(authentication.getName()));
+    public ResponseEntity<User> getCurrentUser(Authentication auth) {
+        return ResponseEntity.ok(userService.findByEmail(auth.getName()));
     }
 
-    /**
-     * Permanently delete the authenticated user's account and all associated data.
-     * Requires confirmation body: { "confirm": "DELETE" }
-     */
+    /** Returns current user's login streak (consecutive days active). */
+    @GetMapping("/streak")
+    public ResponseEntity<Map<String, Integer>> getStreak(Authentication auth) {
+        int streak = userService.getStreak(auth.getName());
+        return ResponseEntity.ok(Map.of("streak", streak));
+    }
+
+    /** Top 20 users by XP for the leaderboard. Read-only, no auth required is fine but keeping it authenticated. */
+    @GetMapping("/leaderboard")
+    public ResponseEntity<List<Map<String, Object>>> getLeaderboard() {
+        return ResponseEntity.ok(userService.getLeaderboard());
+    }
+
     @DeleteMapping("/me")
     public ResponseEntity<Map<String, String>> deleteAccount(
             @RequestBody Map<String, String> body,
-            Authentication authentication) {
+            Authentication auth) {
 
         if (!"DELETE".equals(body.get("confirm"))) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "Send { \"confirm\": \"DELETE\" } to confirm account deletion."));
         }
-
-        userService.deleteAccount(authentication.getName());
+        userService.deleteAccount(auth.getName());
         return ResponseEntity.ok(Map.of("message", "Account deleted. We're sorry to see you go."));
     }
 }

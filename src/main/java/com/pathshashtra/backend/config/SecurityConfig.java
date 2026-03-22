@@ -42,6 +42,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/auth/forgot-password").permitAll()
                     .requestMatchers(HttpMethod.GET,  "/api/auth/reset-password/validate").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/quiz/share/**").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
                     .anyRequest().authenticated()
             )

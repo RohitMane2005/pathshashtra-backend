@@ -13,4 +13,7 @@ public interface CodingProblemRepository extends JpaRepository<CodingProblem, Lo
     List<CodingProblem> findByUserIdAndDifficulty(Long userId, String difficulty);
     Optional<CodingProblem> findByIdAndUserId(Long id, Long userId);
     void deleteByUserId(Long userId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(p) FROM CodingProblem p WHERE p.user.id = :userId AND p.status = 'SOLVED'")
+    long countSolvedByUserId(Long userId);
 }

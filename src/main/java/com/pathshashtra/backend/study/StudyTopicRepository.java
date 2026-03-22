@@ -14,4 +14,7 @@ public interface StudyTopicRepository extends JpaRepository<StudyTopic, Long> {
             "FROM StudyTopic t WHERE t.studyPlan.id = :planId GROUP BY t.subject")
     List<Object[]> getProgressBySubject(Long planId);
     void deleteByStudyPlanUserId(Long userId);
+
+    @Query("SELECT COUNT(t) FROM StudyTopic t WHERE t.studyPlan.user.id = :userId AND t.status = 'COMPLETED'")
+    long countCompletedByUserId(Long userId);
 }
