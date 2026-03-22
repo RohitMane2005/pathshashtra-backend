@@ -6,7 +6,10 @@ import com.pathshashtra.backend.common.JsonCleaner;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 @Service
@@ -16,18 +19,21 @@ public class RoadmapService {
     private final GroqRoadmapService groqRoadmapService;
     private final UserRepository userRepository;
     private final JsonCleaner jsonCleaner;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public RoadmapService(RoadmapRepository roadmapRepository,
                           GroqRoadmapService groqRoadmapService,
                           UserRepository userRepository,
-                          JsonCleaner jsonCleaner) {
+                          JsonCleaner jsonCleaner,
+                          ObjectMapper objectMapper) {
         this.roadmapRepository = roadmapRepository;
         this.groqRoadmapService = groqRoadmapService;
         this.userRepository = userRepository;
         this.jsonCleaner = jsonCleaner;
+        this.objectMapper = objectMapper;
     }
 
+    @Transactional
     public JsonNode generateRoadmap(RoadmapRequest request, String email) {
         User user = getUser(email);
         String rawJson = groqRoadmapService.generateRoadmap(request, user.getName());
@@ -51,9 +57,9 @@ public class RoadmapService {
         }
     }
 
-    public List<Roadmap> getUserRoadmaps(String email) {
+    public Page<Roadmap> getUserRoadmaps(String email, Pageable pageable) {
         User user = getUser(email);
-        return roadmapRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+        return roadmapRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
     }
 
     /** Fixed: verify the roadmap belongs to the requesting user before returning it. */

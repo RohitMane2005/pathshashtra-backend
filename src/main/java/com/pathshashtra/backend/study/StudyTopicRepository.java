@@ -13,4 +13,5 @@ public interface StudyTopicRepository extends JpaRepository<StudyTopic, Long> {
     @Query("SELECT t.subject, COUNT(t), SUM(CASE WHEN t.status = 'COMPLETED' THEN 1 ELSE 0 END) " +
             "FROM StudyTopic t WHERE t.studyPlan.id = :planId GROUP BY t.subject")
     List<Object[]> getProgressBySubject(Long planId);
+    void deleteByStudyPlanUserId(Long userId);
 }

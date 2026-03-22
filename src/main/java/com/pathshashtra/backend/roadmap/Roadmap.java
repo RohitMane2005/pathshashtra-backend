@@ -2,11 +2,14 @@ package com.pathshashtra.backend.roadmap;
 
 import com.pathshashtra.backend.user.User;
 import jakarta.persistence.*;
+import jakarta.persistence.Index;
 import lombok.Data;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "roadmaps")
+@Table(name = "roadmaps", indexes = {
+    @Index(name = "idx_roadmap_user_id", columnList = "user_id")
+})
 @Data
 public class Roadmap {
 

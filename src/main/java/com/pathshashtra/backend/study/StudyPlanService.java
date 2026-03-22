@@ -8,6 +8,7 @@ import com.pathshashtra.backend.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -23,20 +24,23 @@ public class StudyPlanService {
     private final UserRepository userRepository;
     private final GrokStudyPlanService grokService;
     private final JsonCleaner jsonCleaner;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public StudyPlanService(StudyPlanRepository planRepository,
                             StudyTopicRepository topicRepository,
                             UserRepository userRepository,
                             GrokStudyPlanService grokService,
-                            JsonCleaner jsonCleaner) {
+                            JsonCleaner jsonCleaner,
+                            ObjectMapper objectMapper) {
         this.planRepository = planRepository;
         this.topicRepository = topicRepository;
         this.userRepository = userRepository;
         this.grokService = grokService;
         this.jsonCleaner = jsonCleaner;
+        this.objectMapper = objectMapper;
     }
 
+    @Transactional
     public StudyPlan generatePlan(String email, StudyPlanRequest request) {
         User user = getUser(email);
 
@@ -99,6 +103,7 @@ public class StudyPlanService {
         return topicRepository.findByStudyPlanIdAndWeekNumberAndDayNumber(plan.getId(), weekNumber, dayNumber);
     }
 
+    @Transactional
     public StudyTopic updateTopicProgress(String email, TopicProgressRequest request) {
         User user = getUser(email);
 

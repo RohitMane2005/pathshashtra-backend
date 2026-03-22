@@ -6,7 +6,11 @@ import com.pathshashtra.backend.common.JsonCleaner;
 import com.pathshashtra.backend.profile.UserProfileRepository;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -19,20 +23,23 @@ public class CodingService {
     private final UserProfileRepository profileRepository;
     private final GrokCodingService grokCodingService;
     private final JsonCleaner jsonCleaner;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public CodingService(CodingProblemRepository problemRepository,
                          UserRepository userRepository,
                          UserProfileRepository profileRepository,
                          GrokCodingService grokCodingService,
-                         JsonCleaner jsonCleaner) {
+                         JsonCleaner jsonCleaner,
+                         ObjectMapper objectMapper) {
         this.problemRepository = problemRepository;
         this.userRepository = userRepository;
         this.profileRepository = profileRepository;
         this.grokCodingService = grokCodingService;
         this.jsonCleaner = jsonCleaner;
+        this.objectMapper = objectMapper;
     }
 
+    @Transactional
     public Map<String, Object> generateProblem(String email, ProblemGenerateRequest request) {
         User user = getUser(email);
         String problemJson = grokCodingService.generateProblem(
@@ -56,6 +63,7 @@ public class CodingService {
         return response;
     }
 
+    @Transactional
     public Map<String, Object> getHint(String email, HintRequest request) {
         User user = getUser(email);
         CodingProblem problem = problemRepository
@@ -85,6 +93,7 @@ public class CodingService {
         return response;
     }
 
+    @Transactional
     public CodeFeedback submitCode(String email, CodeSubmitRequest request) {
         User user = getUser(email);
         CodingProblem problem = problemRepository
@@ -107,12 +116,13 @@ public class CodingService {
         return feedback;
     }
 
-    public List<Map<String, Object>> getMyProblems(String email) {
+    public Page<Map<String, Object>> getMyProblems(String email, Pageable pageable) {
         User user = getUser(email);
-        List<CodingProblem> problems = problemRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+        Page<CodingProblem> page = problemRepository
+                .findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
 
         List<Map<String, Object>> result = new ArrayList<>();
-        for (CodingProblem p : problems) {
+        for (CodingProblem p : page.getContent()) {
             Map<String, Object> item = new HashMap<>();
             item.put("id", p.getId());
             item.put("title", p.getProblemTitle());
@@ -124,9 +134,10 @@ public class CodingService {
             item.put("createdAt", p.getCreatedAt());
             result.add(item);
         }
-        return result;
+        return new PageImpl<>(result, pageable, page.getTotalElements());
     }
 
+    @Transactional
     public Map<String, Object> getDsaRoadmap(String email, String targetGoal) {
         User user = getUser(email);
         final String[] level = {"Beginner"};

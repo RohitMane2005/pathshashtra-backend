@@ -1,11 +1,15 @@
 package com.pathshashtra.backend.study;
 
 import jakarta.persistence.*;
+import jakarta.persistence.Index;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.*;
 
 @Entity
-@Table(name = "study_topics")
+@Table(name = "study_topics", indexes = {
+    @Index(name = "idx_study_topic_plan_id", columnList = "study_plan_id"),
+    @Index(name = "idx_study_topic_plan_week_day", columnList = "study_plan_id, week_number, day_number")
+})
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
 public class StudyTopic {

@@ -2,11 +2,14 @@ package com.pathshashtra.backend.quiz;
 
 import com.pathshashtra.backend.user.User;
 import jakarta.persistence.*;
+import jakarta.persistence.Index;
 import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "quiz_sessions")
+@Table(name = "quiz_sessions", indexes = {
+    @Index(name = "idx_quiz_user_id", columnList = "user_id")
+})
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
 public class QuizSession {

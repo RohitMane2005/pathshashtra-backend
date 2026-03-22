@@ -1,6 +1,7 @@
 package com.pathshashtra.backend.coding;
 
 import com.pathshashtra.backend.common.GroqClient;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -106,6 +107,7 @@ public class GrokCodingService {
         return groqClient.call(prompt, 2000);
     }
 
+    @Cacheable(value = "dsa-roadmap", key = "#currentLevel + ':' + #targetGoal")
     public String generateRoadmap(String studentName, String currentLevel, String targetGoal) {
         String prompt = """
                 You are an expert DSA mentor for Indian college students.

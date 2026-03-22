@@ -1,6 +1,7 @@
 package com.pathshashtra.backend.quiz;
 
 import com.pathshashtra.backend.common.GroqClient;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -12,6 +13,7 @@ public class ClaudeApiService {
         this.groqClient = groqClient;
     }
 
+    @Cacheable(value = "quiz-questions", key = "#userProfile.hashCode()")
     public String generateQuizQuestions(String userProfile) {
         String prompt = """
             You are a career guidance expert for Indian college students.

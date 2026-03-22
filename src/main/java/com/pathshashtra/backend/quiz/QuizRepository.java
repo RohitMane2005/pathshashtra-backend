@@ -7,4 +7,5 @@ import java.util.Optional;
 public interface QuizRepository extends JpaRepository<QuizSession, Long> {
     List<QuizSession> findByUserIdOrderByCreatedAtDesc(Long userId);
     Optional<QuizSession> findByIdAndUserId(Long id, Long userId);
+    void deleteByUserId(Long userId);
 }

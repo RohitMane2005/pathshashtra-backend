@@ -2,10 +2,14 @@ package com.pathshashtra.backend.user;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import jakarta.persistence.Index;
+import java.time.LocalDateTime;
 import lombok.*;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = {
+    @Index(name = "idx_user_email", columnList = "email", unique = true)
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -25,4 +29,7 @@ public class User {
     private String password;
 
     private String role = "STUDENT";
+
+    /** Soft-delete timestamp. Null = active account. */
+    private LocalDateTime deletedAt;
 }

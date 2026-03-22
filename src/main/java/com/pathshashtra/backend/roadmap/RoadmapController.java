@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 @RestController
 @RequestMapping("/api/roadmap")
@@ -36,8 +38,12 @@ public class RoadmapController {
     }
 
     @GetMapping("/my")
-    public ResponseEntity<List<Roadmap>> getMyRoadmaps(Authentication auth) {
-        return ResponseEntity.ok(roadmapService.getUserRoadmaps(auth.getName()));
+    public ResponseEntity<?> getMyRoadmaps(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            Authentication auth) {
+        size = Math.min(size, 20);
+        return ResponseEntity.ok(roadmapService.getUserRoadmaps(auth.getName(), PageRequest.of(page, size)));
     }
 
     @GetMapping("/{id}")
