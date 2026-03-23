@@ -70,8 +70,12 @@ public class CodingController {
     }
 
     @GetMapping("/problems")
-    public ResponseEntity<List<Map<String, Object>>> getMyProblems(Authentication auth) {
-        return ResponseEntity.ok(codingService.getMyProblems(auth.getName()));
+    public ResponseEntity<?> getMyProblems(
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "50") int size,
+            Authentication auth) {
+        Pageable pageable = PageRequest.of(page, Math.min(size, 50));
+        return ResponseEntity.ok(codingService.getMyProblems(auth.getName(), pageable));
     }
 
     @GetMapping("/roadmap")
