@@ -132,11 +132,30 @@ public class CodingService {
             item.put("status", p.getStatus());
             item.put("hintsUsed", p.getHintsUsed());
             item.put("createdAt", p.getCreatedAt());
+            item.put("problemJson", parseJson(p.getProblemJson()));
+            item.put("submittedCode", p.getSubmittedCode());
             result.add(item);
         }
         return new PageImpl<>(result, pageable, page.getTotalElements());
     }
 
+
+
+    /** Load a single saved problem by ID — used to resume from the problems list. */
+    public Map<String, Object> getProblemById(String email, Long problemId) {
+        User user = getUser(email);
+        CodingProblem problem = problemRepository
+                .findByIdAndUserId(problemId, user.getId())
+                .orElseThrow(() -> new RuntimeException("Problem not found"));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("problemId", problem.getId());
+        response.put("problem", parseJson(problem.getProblemJson()));
+        response.put("submittedCode", problem.getSubmittedCode());
+        response.put("hintsUsed", problem.getHintsUsed());
+        response.put("status", problem.getStatus());
+        return response;
+    }
 
     /** Reset a problem so the user can attempt it again fresh. Clears code, feedback, hints. */
     @Transactional
