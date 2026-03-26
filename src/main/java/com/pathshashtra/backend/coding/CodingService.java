@@ -9,14 +9,20 @@ import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
 public class CodingService {
+
+    private static final Logger log = LoggerFactory.getLogger(CodingService.class);
+
 
     private final CodingProblemRepository problemRepository;
     private final UserRepository userRepository;
@@ -116,6 +122,7 @@ public class CodingService {
         return feedback;
     }
 
+    @Transactional(readOnly = true)
     public Page<Map<String, Object>> getMyProblems(String email, Pageable pageable) {
         User user = getUser(email);
         Page<CodingProblem> page = problemRepository
@@ -142,18 +149,24 @@ public class CodingService {
 
 
     /** Load a single saved problem by ID — used to resume from the problems list. */
+    @Transactional(readOnly = true)
     public Map<String, Object> getProblemById(String email, Long problemId) {
         User user = getUser(email);
+        log.debug("Loading problem {} for user {} (id={})", problemId, email, user.getId());
         CodingProblem problem = problemRepository
                 .findByIdAndUserId(problemId, user.getId())
-                .orElseThrow(() -> new RuntimeException("Problem not found"));
+                .orElseThrow(() -> new RuntimeException("Problem not found: id=" + problemId + " for user=" + email));
 
         Map<String, Object> response = new HashMap<>();
         response.put("problemId", problem.getId());
         response.put("problem", parseJson(problem.getProblemJson()));
         response.put("submittedCode", problem.getSubmittedCode());
+        response.put("feedbackJson", parseJson(problem.getFeedbackJson()));
         response.put("hintsUsed", problem.getHintsUsed());
         response.put("status", problem.getStatus());
+        response.put("language", problem.getLanguage());
+        response.put("topic", problem.getTopic());
+        response.put("difficulty", problem.getDifficulty());
         return response;
     }
 
