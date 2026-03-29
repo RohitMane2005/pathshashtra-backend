@@ -13,7 +13,13 @@ public class GrokCodingService {
         this.groqClient = groqClient;
     }
 
+    private String sanitize(String input) {
+        if (input == null) return "";
+        return input.replaceAll("[\\"'`<>]", "").strip();
+    }
+
     public String generateProblem(String topic, String difficulty, String language) {
+        topic = sanitize(topic); difficulty = sanitize(difficulty); language = sanitize(language);
         String prompt = """
                 You are an expert DSA coding tutor for Indian college students preparing for placements and GATE.
 
@@ -109,6 +115,7 @@ public class GrokCodingService {
 
     @Cacheable(value = "dsa-roadmap", key = "#currentLevel + ':' + #targetGoal")
     public String generateRoadmap(String studentName, String currentLevel, String targetGoal) {
+        studentName = sanitize(studentName); currentLevel = sanitize(currentLevel); targetGoal = sanitize(targetGoal);
         String prompt = """
                 You are an expert DSA mentor for Indian college students.
 

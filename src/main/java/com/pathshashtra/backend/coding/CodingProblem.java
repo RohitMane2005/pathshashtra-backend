@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.coding;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.pathshashtra.backend.user.User;
 import jakarta.persistence.*;
 import jakarta.persistence.Index;
@@ -21,6 +22,7 @@ public class CodingProblem {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnoreProperties({"password", "hibernateLazyInitializer", "handler"})
     private User user;
 
     private String topic;

@@ -17,6 +17,11 @@ public class CareerAIService {
      * Generate 12 psychometric questions tailored to the student's profile.
      * Covers personality, work style, interests, values, and strengths.
      */
+    private String sanitize(String input) {
+        if (input == null) return "";
+        return input.replaceAll("[\\\\"'`<>{}]", "").strip();
+    }
+
     @Cacheable(value = "career-questions", key = "#userProfile.hashCode()")
     public String generateAssessmentQuestions(String userProfile) {
         String prompt = """
@@ -56,7 +61,7 @@ public class CareerAIService {
             - Questions must be relevant to Indian students (IIT, NIT, private colleges, tier-2 cities)
             - Cover all categories: Work Style, Strengths, Values, Problem Solving, Communication, Ambition
             - Make questions insightful and scenario-based, not trivial
-            """.formatted(userProfile);
+            """.formatted(sanitize(userProfile));
 
         return groqClient.call(prompt, 2500);
     }

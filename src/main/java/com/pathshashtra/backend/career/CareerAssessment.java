@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.career;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.pathshashtra.backend.user.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -7,7 +8,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "career_assessments")
+@Table(name = "career_assessments", indexes = {
+    @Index(name = "idx_career_user_id", columnList = "user_id"),
+    @Index(name = "idx_career_user_status", columnList = "user_id, status")
+})
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor
 public class CareerAssessment {
@@ -18,20 +22,16 @@ public class CareerAssessment {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnoreProperties({"password", "hibernateLazyInitializer", "handler"})
     private User user;
 
-    /** Psychometric answers stored as JSON string */
     @Column(columnDefinition = "TEXT")
     private String answersJson;
 
-    /** Full AI analysis result stored as JSON string */
     @Column(columnDefinition = "TEXT")
     private String resultJson;
 
-    /** Top career title from result — for quick listing */
     private String topCareer;
-
-    /** Overall match score of top career */
     private Integer topMatchScore;
 
     private LocalDateTime createdAt = LocalDateTime.now();

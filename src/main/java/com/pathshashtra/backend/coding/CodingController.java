@@ -1,6 +1,7 @@
 package com.pathshashtra.backend.coding;
 
 import com.pathshashtra.backend.ratelimit.RateLimiter;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -24,7 +25,7 @@ public class CodingController {
     }
 
     @PostMapping("/problem/generate")
-    public ResponseEntity<?> generateProblem(@RequestBody ProblemGenerateRequest request, Authentication auth) {
+    public ResponseEntity<?> generateProblem(@Valid @RequestBody ProblemGenerateRequest request, Authentication auth) {
         String email = auth.getName();
         if (!rateLimiter.allowCodingGenerate(email)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -36,7 +37,7 @@ public class CodingController {
     }
 
     @PostMapping("/hint")
-    public ResponseEntity<?> getHint(@RequestBody HintRequest request, Authentication auth) {
+    public ResponseEntity<?> getHint(@Valid @RequestBody HintRequest request, Authentication auth) {
         String email = auth.getName();
         if (!rateLimiter.allowCodingHint(email)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -48,7 +49,7 @@ public class CodingController {
     }
 
     @PostMapping("/submit")
-    public ResponseEntity<?> submitCode(@RequestBody CodeSubmitRequest request, Authentication auth) {
+    public ResponseEntity<?> submitCode(@Valid @RequestBody CodeSubmitRequest request, Authentication auth) {
         String email = auth.getName();
         if (!rateLimiter.allowCodingSubmit(email)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

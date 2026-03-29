@@ -1,6 +1,7 @@
 package com.pathshashtra.backend.roadmap;
 
 import com.pathshashtra.backend.user.User;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.persistence.Index;
 import lombok.Data;
@@ -19,6 +20,7 @@ public class Roadmap {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
+    @JsonIgnoreProperties({"password", "hibernateLazyInitializer", "handler"})
     private User user;
 
     private String goal;

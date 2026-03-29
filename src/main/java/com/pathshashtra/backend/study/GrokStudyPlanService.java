@@ -15,6 +15,12 @@ public class GrokStudyPlanService {
         this.groqClient = groqClient;
     }
 
+    /** Strip characters that could confuse the LLM's JSON parsing or inject instructions */
+    private String sanitize(String input) {
+        if (input == null) return "";
+        return input.replaceAll("[\\"'`<>{}]", "").strip();
+    }
+
     public String generateStudyPlan(StudyPlanRequest request, String studentName) {
         long daysUntilExam = ChronoUnit.DAYS.between(LocalDate.now(), request.getExamDate());
 
@@ -67,11 +73,11 @@ public class GrokStudyPlanService {
 
             Do not include markdown, only pure JSON.
             """.formatted(
-                studentName,
-                request.getPlanTitle(),
-                request.getExamType(),
-                request.getCurrentLevel(),
-                String.join(", ", request.getSubjects()),
+                sanitize(studentName),
+                sanitize(request.getPlanTitle()),
+                sanitize(request.getExamType()),
+                sanitize(request.getCurrentLevel()),
+                sanitize(String.join(", ", request.getSubjects())),
                 daysUntilExam,
                 request.getDailyHours()
         );

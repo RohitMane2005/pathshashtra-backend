@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.study;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.pathshashtra.backend.user.User;
 import jakarta.persistence.*;
 import jakarta.persistence.Index;
@@ -22,6 +23,7 @@ public class StudyPlan {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnoreProperties({"password", "hibernateLazyInitializer", "handler"})
     private User user;
 
     private String planTitle;        // e.g. "JEE Mains 2026 Prep"

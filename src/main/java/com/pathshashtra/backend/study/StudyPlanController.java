@@ -1,6 +1,7 @@
 package com.pathshashtra.backend.study;
 
 import com.pathshashtra.backend.ratelimit.RateLimiter;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -22,7 +23,7 @@ public class StudyPlanController {
     }
 
     @PostMapping("/plan/generate")
-    public ResponseEntity<?> generatePlan(@RequestBody StudyPlanRequest request, Authentication auth) {
+    public ResponseEntity<?> generatePlan(@Valid @RequestBody StudyPlanRequest request, Authentication auth) {
         String email = auth.getName();
         if (!rateLimiter.allowStudyPlanGenerate(email)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -44,7 +45,7 @@ public class StudyPlanController {
     }
 
     @PutMapping("/topic/progress")
-    public ResponseEntity<StudyTopic> updateProgress(@RequestBody TopicProgressRequest request, Authentication auth) {
+    public ResponseEntity<StudyTopic> updateProgress(@Valid @RequestBody TopicProgressRequest request, Authentication auth) {
         return ResponseEntity.ok(studyPlanService.updateTopicProgress(auth.getName(), request));
     }
 

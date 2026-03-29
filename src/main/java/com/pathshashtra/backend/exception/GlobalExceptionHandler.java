@@ -3,6 +3,7 @@ package com.pathshashtra.backend.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
@@ -31,6 +32,21 @@ public class GlobalExceptionHandler {
                 "error", message != null ? message : "Something went wrong",
                 "status", status.value(),
                 "timestamp", LocalDateTime.now().toString()
+        ));
+    }
+
+
+    /** FIX: handles @Valid failures — returns readable field errors instead of 500 */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
+        String firstError = ex.getBindingResult().getFieldErrors().stream()
+                .map(e -> e.getField() + ": " + e.getDefaultMessage())
+                .findFirst()
+                .orElse("Validation failed");
+        return ResponseEntity.badRequest().body(Map.of(
+                "error", firstError,
+                "status", 400,
+                "timestamp", java.time.LocalDateTime.now().toString()
         ));
     }
 

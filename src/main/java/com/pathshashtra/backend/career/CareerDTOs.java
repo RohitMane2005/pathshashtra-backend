@@ -44,19 +44,3 @@ public class CareerResult {
         private String timeframe;
     }
 }
-
-/** Summary for listing past assessments */
-@Data @NoArgsConstructor @AllArgsConstructor
-class CareerAssessmentSummary {
-    private Long id;
-    private String topCareer;
-    private Integer topMatchScore;
-    private String personalitySummary;
-    private LocalDateTime completedAt;
-}
-
-/** Request body for submitting psychometric answers */
-@Data @NoArgsConstructor @AllArgsConstructor
-class CareerSubmitRequest {
-    private List<String> answers; // One answer per question, e.g. ["A", "C", "B", ...]
-}

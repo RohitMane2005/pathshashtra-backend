@@ -2,6 +2,7 @@ package com.pathshashtra.backend.user;
 
 import com.pathshashtra.backend.auth.PasswordResetRepository;
 import com.pathshashtra.backend.bookmark.SavedItemRepository;
+import com.pathshashtra.backend.career.CareerAssessmentRepository;
 import com.pathshashtra.backend.coding.CodingProblemRepository;
 import com.pathshashtra.backend.profile.UserProfileRepository;
 import com.pathshashtra.backend.quiz.QuizRepository;
@@ -31,6 +32,7 @@ public class UserService {
     private final PasswordResetRepository passwordResetRepository;
     private final UserActivityRepository activityRepository;
     private final SavedItemRepository savedItemRepository;
+    private final CareerAssessmentRepository careerAssessmentRepository;
 
     public UserService(UserRepository userRepository,
                        UserProfileRepository profileRepository,
@@ -41,7 +43,8 @@ public class UserService {
                        StudyTopicRepository studyTopicRepository,
                        PasswordResetRepository passwordResetRepository,
                        UserActivityRepository activityRepository,
-                       SavedItemRepository savedItemRepository) {
+                       SavedItemRepository savedItemRepository,
+                       CareerAssessmentRepository careerAssessmentRepository) {
         this.userRepository = userRepository;
         this.profileRepository = profileRepository;
         this.codingProblemRepository = codingProblemRepository;
@@ -52,6 +55,7 @@ public class UserService {
         this.passwordResetRepository = passwordResetRepository;
         this.activityRepository = activityRepository;
         this.savedItemRepository = savedItemRepository;
+        this.careerAssessmentRepository = careerAssessmentRepository;
     }
 
     public User findByEmail(String email) {
@@ -59,10 +63,6 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
     }
 
-    /**
-     * Calculates consecutive-day login streak from activity records.
-     * Streak = number of consecutive calendar days ending today (or yesterday if not active today).
-     */
     public int getStreak(String email) {
         User user = findByEmail(email);
         List<LocalDate> dates = activityRepository.findDatesByUserIdDesc(user.getId());
@@ -85,23 +85,32 @@ public class UserService {
     }
 
     /**
-     * Leaderboard: top 20 users by XP.
-     * XP = solved problems * 50 + completed topics * 30 + completed quizzes * 100
-     * Computed in-app from existing tables — no new columns needed.
+     * FIX: was loading ALL users then doing per-user queries (N+1 problem).
+     * Now uses a single aggregate JPQL query per metric, then merges in-memory.
+     * Limits to top 20 by XP. Excludes soft-deleted users.
      */
     public List<Map<String, Object>> getLeaderboard() {
+        // Single query per metric — aggregate counts grouped by userId
+        List<Object[]> problemCounts = codingProblemRepository.countSolvedGroupedByUser();
+        List<Object[]> topicCounts   = studyTopicRepository.countCompletedGroupedByUser();
+        List<Object[]> quizCounts    = quizRepository.countCompletedGroupedByUser();
+
+        Map<Long, Long> problemMap = toMap(problemCounts);
+        Map<Long, Long> topicMap   = toMap(topicCounts);
+        Map<Long, Long> quizMap    = toMap(quizCounts);
+
         List<User> users = userRepository.findAll().stream()
                 .filter(u -> u.getDeletedAt() == null)
                 .toList();
 
         List<Map<String, Object>> board = new ArrayList<>();
         for (User user : users) {
-            long problems = codingProblemRepository.countSolvedByUserId(user.getId());
-            long topics   = studyTopicRepository.countCompletedByUserId(user.getId());
-            long quizzes  = quizRepository.countCompletedByUserId(user.getId());
+            long problems = problemMap.getOrDefault(user.getId(), 0L);
+            long topics   = topicMap.getOrDefault(user.getId(), 0L);
+            long quizzes  = quizMap.getOrDefault(user.getId(), 0L);
             long xp = problems * 50 + topics * 30 + quizzes * 100;
 
-            Map<String, Object> entry = new HashMap<>();
+            Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("name", user.getName());
             entry.put("xp", xp);
             entry.put("problems", problems);
@@ -114,11 +123,20 @@ public class UserService {
         return board.stream().limit(20).toList();
     }
 
+    private Map<Long, Long> toMap(List<Object[]> rows) {
+        Map<Long, Long> map = new HashMap<>();
+        for (Object[] row : rows) {
+            map.put((Long) row[0], (Long) row[1]);
+        }
+        return map;
+    }
+
     @Transactional
     public void deleteAccount(String email) {
         User user = findByEmail(email);
         Long userId = user.getId();
 
+        careerAssessmentRepository.deleteByUserId(userId);
         studyTopicRepository.deleteByStudyPlanUserId(userId);
         studyPlanRepository.deleteByUserId(userId);
         codingProblemRepository.deleteByUserId(userId);

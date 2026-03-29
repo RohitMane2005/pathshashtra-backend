@@ -1,6 +1,7 @@
 package com.pathshashtra.backend.bookmark;
 
 import com.pathshashtra.backend.user.User;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -17,6 +18,7 @@ public class SavedItem {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnoreProperties({"password", "hibernateLazyInitializer", "handler"})
     private User user;
 
     @Column(nullable = false) private String type;
