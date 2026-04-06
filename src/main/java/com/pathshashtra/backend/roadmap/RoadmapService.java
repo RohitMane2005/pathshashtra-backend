@@ -10,7 +10,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class RoadmapService {
@@ -38,6 +41,7 @@ public class RoadmapService {
         User user = getUser(email);
         String rawJson = groqRoadmapService.generateRoadmap(request, user.getName());
         String cleaned = jsonCleaner.clean(rawJson);
+        if (cleaned == null) throw new RuntimeException("AI returned empty roadmap response");
 
         try {
             JsonNode roadmapNode = objectMapper.readTree(cleaned);
@@ -57,9 +61,31 @@ public class RoadmapService {
         }
     }
 
-    public Page<Roadmap> getUserRoadmaps(String email, Pageable pageable) {
+    /**
+     * FIX: Returns plain Map instead of Page<Roadmap>.
+     * PageImpl is not Jackson-serializable without spring-data-web, causing HTTP 500.
+     * Roadmap entity also exposes roadmapJson (large TEXT column) — only return summary fields.
+     */
+    public Map<String, Object> getUserRoadmaps(String email, Pageable pageable) {
         User user = getUser(email);
-        return roadmapRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
+        Page<Roadmap> page = roadmapRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Roadmap r : page.getContent()) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", r.getId());
+            item.put("goal", r.getGoal());
+            item.put("currentLevel", r.getCurrentLevel());
+            item.put("timeframe", r.getTimeframe());
+            item.put("focusArea", r.getFocusArea());
+            item.put("createdAt", r.getCreatedAt() != null ? r.getCreatedAt().toString() : null);
+            items.add(item);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", items);
+        response.put("totalElements", page.getTotalElements());
+        return response;
     }
 
     /** Fixed: verify the roadmap belongs to the requesting user before returning it. */

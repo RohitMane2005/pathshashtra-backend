@@ -7,7 +7,6 @@ import com.pathshashtra.backend.profile.UserProfileRepository;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,8 +125,15 @@ public class CodingService {
         return feedback;
     }
 
+    /**
+     * FIX: Returns plain List instead of PageImpl.
+     * PageImpl is not Jackson-serializable without spring-data-web dependency,
+     * causing HTTP 500 on GET /coding/problems. Plain List serializes cleanly.
+     * The controller wraps it in a Map with "content" and "totalElements" keys
+     * to preserve the same response shape the frontend expects.
+     */
     @Transactional(readOnly = true)
-    public Page<Map<String, Object>> getMyProblems(String email, Pageable pageable) {
+    public Map<String, Object> getMyProblems(String email, Pageable pageable) {
         User user = getUser(email);
         Page<CodingProblem> page = problemRepository
                 .findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
@@ -140,16 +146,19 @@ public class CodingService {
             item.put("topic", p.getTopic());
             item.put("difficulty", p.getDifficulty());
             item.put("language", p.getLanguage());
-            item.put("status", p.getStatus());
+            item.put("status", p.getStatus().name()); // serialize enum as String explicitly
             item.put("hintsUsed", p.getHintsUsed());
-            item.put("createdAt", p.getCreatedAt());
-            // FIX: Removed problemJson and submittedCode from list response.
-            // These large text blobs are not needed by the problems list UI, caused
-            // HTTP 500 when any record had a null/malformed problemJson, and added
-            // significant payload size. Load them on demand via getProblemById().
+            item.put("createdAt", p.getCreatedAt() != null ? p.getCreatedAt().toString() : null);
             result.add(item);
         }
-        return new PageImpl<>(result, pageable, page.getTotalElements());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", result);
+        response.put("totalElements", page.getTotalElements());
+        response.put("totalPages", page.getTotalPages());
+        response.put("number", page.getNumber());
+        response.put("size", page.getSize());
+        return response;
     }
 
 
