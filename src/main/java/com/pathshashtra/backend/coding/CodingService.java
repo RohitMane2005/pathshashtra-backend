@@ -139,8 +139,10 @@ public class CodingService {
             item.put("status", p.getStatus());
             item.put("hintsUsed", p.getHintsUsed());
             item.put("createdAt", p.getCreatedAt());
-            item.put("problemJson", parseJson(p.getProblemJson()));
-            item.put("submittedCode", p.getSubmittedCode());
+            // FIX: Removed problemJson and submittedCode from list response.
+            // These large text blobs are not needed by the problems list UI, caused
+            // HTTP 500 when any record had a null/malformed problemJson, and added
+            // significant payload size. Load them on demand via getProblemById().
             result.add(item);
         }
         return new PageImpl<>(result, pageable, page.getTotalElements());
@@ -218,11 +220,17 @@ public class CodingService {
         }
     }
 
+    /**
+     * FIX: Guard against null — objectMapper.readTree(null) throws NullPointerException.
+     * Any problem with a null/missing JSON column caused the entire list endpoint to 500.
+     */
     private Object parseJson(String json) {
+        if (json == null || json.isBlank()) return null;
         try {
             return objectMapper.readTree(json);
         } catch (Exception e) {
-            return json;
+            log.warn("Could not parse JSON field: {}", e.getMessage());
+            return null;
         }
     }
 
