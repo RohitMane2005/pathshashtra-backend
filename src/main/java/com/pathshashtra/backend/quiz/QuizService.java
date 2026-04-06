@@ -14,6 +14,12 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.Base64;
 
+/**
+ * FIX (CRITICAL): submitQuizWithToken() and getPublicResult() were declared
+ * OUTSIDE the class body — the closing brace on line 193 ended the class,
+ * leaving orphaned methods after it. Java compile error masked by pre-built
+ * .class files in /target. Fixed: closing brace moved to after all methods.
+ */
 @Service
 public class QuizService {
 
@@ -78,7 +84,6 @@ public class QuizService {
         session.setStatus(QuizSession.QuizStatus.COMPLETED);
         session.setCompletedAt(LocalDateTime.now());
 
-        // Generate a URL-safe share token
         byte[] bytes = new byte[16];
         new SecureRandom().nextBytes(bytes);
         session.setShareToken(Base64.getUrlEncoder().withoutPadding().encodeToString(bytes));
@@ -115,6 +120,40 @@ public class QuizService {
         if (session.getResultJson() == null) throw new RuntimeException("Quiz not completed yet");
         return parseQuizResult(session.getResultJson());
     }
+
+    /** Same as submitQuiz but also returns the shareToken in the response. */
+    @Transactional
+    public Map<String, Object> submitQuizWithToken(String email, QuizSubmitRequest request) {
+        QuizResult result = submitQuiz(email, request);
+        QuizSession session = quizRepository
+                .findByIdAndUserId(request.getSessionId(), getUser(email).getId())
+                .orElseThrow(() -> new RuntimeException("Session not found"));
+        Map<String, Object> resp = new java.util.LinkedHashMap<>();
+        resp.put("shareToken", session.getShareToken());
+        resp.put("summary", result.getSummary());
+        resp.put("careerMatches", result.getCareerMatches());
+        resp.put("skillGaps", result.getSkillGaps());
+        resp.put("roadmap", result.getRoadmap());
+        resp.put("salaryInfo", result.getSalaryInfo());
+        return resp;
+    }
+
+    /** Public read-only result by share token — no auth required. */
+    public Map<String, Object> getPublicResult(String shareToken) {
+        QuizSession session = quizRepository.findByShareToken(shareToken)
+                .orElseThrow(() -> new RuntimeException("Result not found"));
+        if (session.getResultJson() == null) throw new RuntimeException("Quiz not completed");
+
+        QuizResult result = parseQuizResult(session.getResultJson());
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("summary", result.getSummary());
+        resp.put("careerMatches", result.getCareerMatches());
+        resp.put("salaryInfo", result.getSalaryInfo());
+        resp.put("completedAt", session.getCompletedAt());
+        return resp;
+    }
+
+    // ─── private helpers ──────────────────────────────────────────────────────
 
     private User getUser(String email) {
         return userRepository.findByEmail(email)
@@ -190,38 +229,4 @@ public class QuizService {
             throw new RuntimeException("Failed to parse quiz result: " + e.getMessage());
         }
     }
-}
-
-
-    /** Same as submitQuiz but also returns the shareToken in the response. */
-    @Transactional
-    public Map<String, Object> submitQuizWithToken(String email, QuizSubmitRequest request) {
-        QuizResult result = submitQuiz(email, request);
-        QuizSession session = quizRepository
-                .findByIdAndUserId(request.getSessionId(), getUser(email).getId())
-                .orElseThrow(() -> new RuntimeException("Session not found"));
-        Map<String, Object> resp = new java.util.LinkedHashMap<>();
-        resp.put("shareToken", session.getShareToken());
-        resp.put("summary", result.getSummary());
-        resp.put("careerMatches", result.getCareerMatches());
-        resp.put("skillGaps", result.getSkillGaps());
-        resp.put("roadmap", result.getRoadmap());
-        resp.put("salaryInfo", result.getSalaryInfo());
-        return resp;
-    }
-
-    /** Public read-only result by share token — no auth required. */
-    public Map<String, Object> getPublicResult(String shareToken) {
-        QuizSession session = quizRepository.findByShareToken(shareToken)
-                .orElseThrow(() -> new RuntimeException("Result not found"));
-        if (session.getResultJson() == null) throw new RuntimeException("Quiz not completed");
-
-        QuizResult result = parseQuizResult(session.getResultJson());
-        Map<String, Object> resp = new HashMap<>();
-        resp.put("summary", result.getSummary());
-        resp.put("careerMatches", result.getCareerMatches());
-        resp.put("salaryInfo", result.getSalaryInfo());
-        resp.put("completedAt", session.getCompletedAt());
-        return resp;
-    }
-}
+} // class closes here — after all methods

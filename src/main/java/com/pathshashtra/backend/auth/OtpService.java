@@ -15,6 +15,7 @@ public class OtpService {
     private final Map<String, OtpEntry> otpStore = new ConcurrentHashMap<>();
 
     public String generateOtp(String email) {
+        cleanExpired(); // FIX: evict stale entries so the map does not grow unboundedly
         // Generate cryptographically secure 6-digit OTP
         String otp = String.format("%06d", secureRandom.nextInt(1000000));
         otpStore.put(email.toLowerCase().trim(),

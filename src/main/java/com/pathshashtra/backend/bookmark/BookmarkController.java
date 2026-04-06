@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/bookmarks")
@@ -29,9 +30,15 @@ public class BookmarkController {
         return ResponseEntity.ok(savedItemRepository.findByUserIdOrderBySavedAtDesc(getUser(auth).getId()));
     }
 
+    // FIX: Allowlist bookmark types — prevents arbitrary strings being persisted
+    private static final Set<String> ALLOWED_TYPES = Set.of("problem", "roadmap", "quiz");
+
     @PostMapping("/toggle")
     @Transactional
     public ResponseEntity<Map<String, Object>> toggle(@RequestBody BookmarkRequest req, Authentication auth) {
+        if (req.getType() == null || !ALLOWED_TYPES.contains(req.getType())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid bookmark type. Must be one of: problem, roadmap, quiz"));
+        }
         User user = getUser(auth);
         boolean exists = savedItemRepository.existsByUserIdAndTypeAndRefId(user.getId(), req.getType(), req.getRefId());
         if (exists) {
