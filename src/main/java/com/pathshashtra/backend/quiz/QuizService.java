@@ -174,7 +174,7 @@ public class QuizService {
 
     private QuizStartResponse parseQuestionsResponse(Long sessionId, String json) {
         try {
-            JsonNode root = objectMapper.readTree(jsonCleaner.clean(json));
+            JsonNode root = jsonCleaner.cleanAndParse(json);
             List<QuizStartResponse.QuizQuestion> questions = new ArrayList<>();
             for (JsonNode q : root.path("questions")) {
                 List<String> options = new ArrayList<>();
@@ -190,7 +190,7 @@ public class QuizService {
 
     private QuizResult parseQuizResult(String json) {
         try {
-            JsonNode root = objectMapper.readTree(jsonCleaner.clean(json));
+            JsonNode root = jsonCleaner.cleanAndParse(json);
 
             List<QuizResult.CareerMatch> careers = new ArrayList<>();
             for (JsonNode c : root.path("careerMatches")) {

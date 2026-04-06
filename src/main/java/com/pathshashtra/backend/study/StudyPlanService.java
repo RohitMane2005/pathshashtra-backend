@@ -81,7 +81,7 @@ public class StudyPlanService {
         response.put("daysUntilExam", ChronoUnit.DAYS.between(LocalDate.now(), plan.getExamDate()));
 
         try {
-            response.put("plan", objectMapper.readTree(jsonCleaner.clean(plan.getPlanJson())));
+            response.put("plan", jsonCleaner.cleanAndParse(plan.getPlanJson()));
         } catch (Exception e) {
             response.put("plan", plan.getPlanJson());
         }
@@ -166,7 +166,7 @@ public class StudyPlanService {
 
     private void saveTopicsFromPlan(StudyPlan plan, String planJson) {
         try {
-            JsonNode root = objectMapper.readTree(jsonCleaner.clean(planJson));
+            JsonNode root = jsonCleaner.cleanAndParse(planJson);
             JsonNode subjectsNode = root.path("subjects");
 
             if (subjectsNode.isMissingNode() || !subjectsNode.isArray()) {

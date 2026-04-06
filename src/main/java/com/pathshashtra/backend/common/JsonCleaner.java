@@ -1,5 +1,8 @@
 package com.pathshashtra.backend.common;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.NullNode;
 import org.springframework.stereotype.Component;
 
 /**
@@ -8,8 +11,26 @@ import org.springframework.stereotype.Component;
 @Component
 public class JsonCleaner {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    /**
+     * Clean then parse — null-safe single entry point for all LLM JSON fields.
+     * Returns NullNode (never Java null) so callers can safely call .path(), .asText() etc.
+     * FIX: Previously each service called objectMapper.readTree(jsonCleaner.clean(x)) directly,
+     * which threw NullPointerException when x was null (e.g. feedbackJson on unsolved problems).
+     */
+    public JsonNode cleanAndParse(String raw) {
+        String cleaned = clean(raw);
+        if (cleaned == null) return NullNode.getInstance();
+        try {
+            return objectMapper.readTree(cleaned);
+        } catch (Exception e) {
+            return NullNode.getInstance();
+        }
+    }
+
     public String clean(String raw) {
-        if (raw == null) return "{}";
+        if (raw == null || raw.isBlank()) return null;
         String s = raw.trim();
         if (s.startsWith("```json")) s = s.substring(7);
         else if (s.startsWith("```")) s = s.substring(3);

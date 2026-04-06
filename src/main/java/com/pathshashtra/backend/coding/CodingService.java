@@ -110,10 +110,14 @@ public class CodingService {
                 problem.getProblemJson(), request.getCode(), request.getLanguage());
 
         problem.setSubmittedCode(request.getCode());
-        problem.setFeedbackJson(feedbackJson);
+        // FIX: Store feedbackJson AFTER cleaning so it is always valid JSON in the DB.
+        // Previously stored raw LLM output (may contain ```json fences) which caused
+        // JSON.parse to fail when loading old problems from the problems list.
+        String cleanedFeedback = jsonCleaner.clean(feedbackJson);
+        problem.setFeedbackJson(cleanedFeedback);
         problem.setStatus(CodingProblem.ProblemStatus.REVIEWED);
 
-        CodeFeedback feedback = parseFeedback(jsonCleaner.clean(feedbackJson));
+        CodeFeedback feedback = parseFeedback(cleanedFeedback);
         if (feedback.isCorrect()) {
             problem.setStatus(CodingProblem.ProblemStatus.SOLVED);
             problem.setSolvedAt(LocalDateTime.now());
@@ -163,7 +167,9 @@ public class CodingService {
         response.put("problemId", problem.getId());
         response.put("problem", parseJson(problem.getProblemJson()));
         response.put("submittedCode", problem.getSubmittedCode());
-        response.put("feedbackJson", parseJson(problem.getFeedbackJson()));
+        // FIX: Run JsonCleaner on feedbackJson when reading too, for backward
+        // compatibility with old records that were stored before the cleaning fix.
+        response.put("feedbackJson", parseJson(jsonCleaner.clean(problem.getFeedbackJson())));
         response.put("hintsUsed", problem.getHintsUsed());
         response.put("status", problem.getStatus());
         response.put("language", problem.getLanguage());
@@ -221,13 +227,17 @@ public class CodingService {
     }
 
     /**
-     * FIX: Guard against null — objectMapper.readTree(null) throws NullPointerException.
-     * Any problem with a null/missing JSON column caused the entire list endpoint to 500.
+     * FIX: Null-safe JSON parser that also runs JsonCleaner for backward compatibility.
+     * Old records stored before the cleaning fix may have ```json fences in the DB.
+     * objectMapper.readTree(null) throws NPE — now guarded and cleaned first.
      */
     private Object parseJson(String json) {
         if (json == null || json.isBlank()) return null;
         try {
-            return objectMapper.readTree(json);
+            // Run through JsonCleaner to handle old records with LLM markdown fences
+            String cleaned = jsonCleaner.clean(json);
+            if (cleaned == null || cleaned.isBlank()) return null;
+            return objectMapper.readTree(cleaned);
         } catch (Exception e) {
             log.warn("Could not parse JSON field: {}", e.getMessage());
             return null;

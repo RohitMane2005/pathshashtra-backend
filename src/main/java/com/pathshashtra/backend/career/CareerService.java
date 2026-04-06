@@ -43,7 +43,7 @@ public class CareerService {
         String questionsJson = careerAIService.generateAssessmentQuestions(profileCtx);
 
         try {
-            JsonNode root = objectMapper.readTree(jsonCleaner.clean(questionsJson));
+            JsonNode root = jsonCleaner.cleanAndParse(questionsJson);
             return Map.of("questions", root.path("questions"));
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse career questions: " + e.getMessage());
@@ -144,7 +144,7 @@ public class CareerService {
 
     private CareerResult parseResult(String json) {
         try {
-            JsonNode root = objectMapper.readTree(jsonCleaner.clean(json));
+            JsonNode root = jsonCleaner.cleanAndParse(json);
 
             // Parse top careers
             List<CareerResult.CareerPath> careers = new ArrayList<>();
