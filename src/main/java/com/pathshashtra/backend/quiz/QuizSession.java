@@ -9,20 +9,22 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "quiz_sessions", indexes = {
-    @Index(name = "idx_quiz_user_id",     columnList = "user_id"),
-    @Index(name = "idx_quiz_share_token", columnList = "share_token")
+        @Index(name = "idx_quiz_user_id", columnList = "user_id"),
+        @Index(name = "idx_quiz_share_token", columnList = "share_token")
 })
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class QuizSession {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    @JsonIgnoreProperties({"password", "hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({ "password", "hibernateLazyInitializer", "handler" })
     private User user;
 
     // JSON string of generated questions from Claude

@@ -2,6 +2,7 @@ package com.pathshashtra.backend.roadmap;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.pathshashtra.backend.ratelimit.RateLimiter;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -24,7 +25,7 @@ public class RoadmapController {
     }
 
     @PostMapping("/generate")
-    public ResponseEntity<?> generateRoadmap(@RequestBody RoadmapRequest request, Authentication auth) {
+    public ResponseEntity<?> generateRoadmap(@Valid @RequestBody RoadmapRequest request, Authentication auth) {
         String email = auth.getName();
         if (!rateLimiter.allowRoadmapGenerate(email)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

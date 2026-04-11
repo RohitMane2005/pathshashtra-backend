@@ -9,20 +9,22 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "coding_problems", indexes = {
-    @Index(name = "idx_coding_user_id", columnList = "user_id"),
-    @Index(name = "idx_coding_user_status", columnList = "user_id, status")
+        @Index(name = "idx_coding_user_id", columnList = "user_id"),
+        @Index(name = "idx_coding_user_status", columnList = "user_id, status")
 })
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class CodingProblem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    @JsonIgnoreProperties({"password", "hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({ "password", "hibernateLazyInitializer", "handler" })
     private User user;
 
     private String topic;

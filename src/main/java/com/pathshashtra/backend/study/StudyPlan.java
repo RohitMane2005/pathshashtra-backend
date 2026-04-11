@@ -10,29 +10,31 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "study_plans", indexes = {
-    @Index(name = "idx_study_plan_user_id", columnList = "user_id"),
-    @Index(name = "idx_study_plan_user_status", columnList = "user_id, status")
+        @Index(name = "idx_study_plan_user_id", columnList = "user_id"),
+        @Index(name = "idx_study_plan_user_status", columnList = "user_id, status")
 })
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class StudyPlan {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    @JsonIgnoreProperties({"password", "hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({ "password", "hibernateLazyInitializer", "handler" })
     private User user;
 
-    private String planTitle;        // e.g. "JEE Mains 2026 Prep"
-    private LocalDate examDate;      // Target exam date
-    private int dailyHours;          // Hours student can study per day
-    private LocalDate startDate;     // When plan begins
+    private String planTitle; // e.g. "JEE Mains 2026 Prep"
+    private LocalDate examDate; // Target exam date
+    private int dailyHours; // Hours student can study per day
+    private LocalDate startDate; // When plan begins
 
     @Column(columnDefinition = "TEXT")
-    private String planJson;         // Full AI-generated plan JSON
+    private String planJson; // Full AI-generated plan JSON
 
     @Enumerated(EnumType.STRING)
     private PlanStatus status = PlanStatus.ACTIVE;

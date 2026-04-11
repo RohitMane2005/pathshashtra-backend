@@ -37,7 +37,11 @@ public class BookmarkController {
     @Transactional
     public ResponseEntity<Map<String, Object>> toggle(@RequestBody BookmarkRequest req, Authentication auth) {
         if (req.getType() == null || !ALLOWED_TYPES.contains(req.getType())) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid bookmark type. Must be one of: problem, roadmap, quiz"));
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Invalid bookmark type. Must be one of: problem, roadmap, quiz"));
+        }
+        if (req.getRefId() == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "refId is required"));
         }
         User user = getUser(auth);
         boolean exists = savedItemRepository.existsByUserIdAndTypeAndRefId(user.getId(), req.getType(), req.getRefId());
@@ -66,7 +70,8 @@ public class BookmarkController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
-    @Getter @Setter
+    @Getter
+    @Setter
     public static class BookmarkRequest {
         private String type;
         private Long refId;

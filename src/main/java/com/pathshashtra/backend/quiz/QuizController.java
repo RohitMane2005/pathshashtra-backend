@@ -1,6 +1,7 @@
 package com.pathshashtra.backend.quiz;
 
 import com.pathshashtra.backend.ratelimit.RateLimiter;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -34,7 +35,7 @@ public class QuizController {
     }
 
     @PostMapping("/submit")
-    public ResponseEntity<?> submitQuiz(@RequestBody QuizSubmitRequest request, Authentication auth) {
+    public ResponseEntity<?> submitQuiz(@Valid @RequestBody QuizSubmitRequest request, Authentication auth) {
         return ResponseEntity.ok(quizService.submitQuizWithToken(auth.getName(), request));
     }
 

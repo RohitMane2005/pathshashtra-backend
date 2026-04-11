@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.profile;
 
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -16,7 +17,7 @@ public class UserProfileController {
 
     @PostMapping
     public ResponseEntity<UserProfile> saveProfile(
-            @RequestBody UserProfileRequest request,
+            @Valid @RequestBody UserProfileRequest request,
             Authentication authentication) {
         return ResponseEntity.ok(service.saveProfile(authentication.getName(), request));
     }

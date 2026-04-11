@@ -27,7 +27,7 @@ public class AuthService {
         return userRepository.findByEmail(email).isPresent();
     }
 
-    /** Register from DTO — no mass-assignment risk. Returns JWT directly. */
+    /** Register from DTO -- no mass-assignment risk. Returns JWT directly. */
     public AuthResponse register(RegisterRequest request) {
         User user = new User();
         user.setName(request.getName());
