@@ -27,11 +27,11 @@ public class StudyPlanService {
     private final ObjectMapper objectMapper;
 
     public StudyPlanService(StudyPlanRepository planRepository,
-                            StudyTopicRepository topicRepository,
-                            UserRepository userRepository,
-                            GrokStudyPlanService grokService,
-                            JsonCleaner jsonCleaner,
-                            ObjectMapper objectMapper) {
+            StudyTopicRepository topicRepository,
+            UserRepository userRepository,
+            GrokStudyPlanService grokService,
+            JsonCleaner jsonCleaner,
+            ObjectMapper objectMapper) {
         this.planRepository = planRepository;
         this.topicRepository = topicRepository;
         this.userRepository = userRepository;
@@ -69,11 +69,17 @@ public class StudyPlanService {
 
     public Map<String, Object> getActivePlan(String email) {
         User user = getUser(email);
-        StudyPlan plan = planRepository
-                .findByUserIdAndStatus(user.getId(), StudyPlan.PlanStatus.ACTIVE)
-                .orElseThrow(() -> new RuntimeException("No active study plan found"));
+        Optional<StudyPlan> planOpt = planRepository
+                .findByUserIdAndStatus(user.getId(), StudyPlan.PlanStatus.ACTIVE);
+
+        if (planOpt.isEmpty()) {
+            return Map.of("exists", false);
+        }
+
+        StudyPlan plan = planOpt.get();
 
         Map<String, Object> response = new HashMap<>();
+        response.put("exists", true);
         response.put("planId", plan.getId());
         response.put("planTitle", plan.getPlanTitle());
         response.put("examDate", plan.getExamDate());
@@ -91,9 +97,12 @@ public class StudyPlanService {
 
     public List<StudyTopic> getTodaysTopics(String email) {
         User user = getUser(email);
-        StudyPlan plan = planRepository
-                .findByUserIdAndStatus(user.getId(), StudyPlan.PlanStatus.ACTIVE)
-                .orElseThrow(() -> new RuntimeException("No active study plan found"));
+        Optional<StudyPlan> planOpt = planRepository
+                .findByUserIdAndStatus(user.getId(), StudyPlan.PlanStatus.ACTIVE);
+
+        if (planOpt.isEmpty())
+            return Collections.emptyList();
+        StudyPlan plan = planOpt.get();
 
         long daysSinceStart = ChronoUnit.DAYS.between(plan.getStartDate(), LocalDate.now()) + 1;
         int weekNumber = (int) Math.ceil(daysSinceStart / 7.0);
@@ -125,17 +134,23 @@ public class StudyPlanService {
 
     public List<StudyTopic> getWeakTopics(String email) {
         User user = getUser(email);
-        StudyPlan plan = planRepository
-                .findByUserIdAndStatus(user.getId(), StudyPlan.PlanStatus.ACTIVE)
-                .orElseThrow(() -> new RuntimeException("No active study plan found"));
-        return topicRepository.findByStudyPlanIdAndIsWeak(plan.getId(), true);
+        Optional<StudyPlan> planOpt = planRepository
+                .findByUserIdAndStatus(user.getId(), StudyPlan.PlanStatus.ACTIVE);
+        if (planOpt.isEmpty())
+            return Collections.emptyList();
+        return topicRepository.findByStudyPlanIdAndIsWeak(planOpt.get().getId(), true);
     }
 
     public StudyProgressResponse getProgress(String email) {
         User user = getUser(email);
-        StudyPlan plan = planRepository
-                .findByUserIdAndStatus(user.getId(), StudyPlan.PlanStatus.ACTIVE)
-                .orElseThrow(() -> new RuntimeException("No active study plan found"));
+        Optional<StudyPlan> planOpt = planRepository
+                .findByUserIdAndStatus(user.getId(), StudyPlan.PlanStatus.ACTIVE);
+
+        if (planOpt.isEmpty()) {
+            return new StudyProgressResponse(0, 0, 0, Collections.emptyList(), 0, 0);
+        }
+
+        StudyPlan plan = planOpt.get();
 
         List<StudyTopic> allTopics = topicRepository.findByStudyPlanId(plan.getId());
         int total = allTopics.size();
@@ -179,12 +194,14 @@ public class StudyPlanService {
             for (JsonNode subject : subjectsNode) {
                 String subjectName = subject.path("name").asText();
                 JsonNode weeklyTopics = subject.path("weeklyTopics");
-                if (weeklyTopics.isMissingNode() || !weeklyTopics.isArray()) continue;
+                if (weeklyTopics.isMissingNode() || !weeklyTopics.isArray())
+                    continue;
 
                 for (JsonNode weekNode : weeklyTopics) {
                     int week = weekNode.path("week").asInt();
                     JsonNode topics = weekNode.path("topics");
-                    if (topics.isMissingNode() || !topics.isArray()) continue;
+                    if (topics.isMissingNode() || !topics.isArray())
+                        continue;
 
                     for (JsonNode topicNode : topics) {
                         StudyTopic topic = new StudyTopic();

@@ -16,7 +16,8 @@ import java.util.Map;
 
 /**
  * Shared Groq/LLM HTTP client.
- * Single RestTemplate instance — connection pool is reused across all AI services.
+ * Single RestTemplate instance — connection pool is reused across all AI
+ * services.
  * Configured with connect + read timeouts to prevent thread exhaustion.
  */
 @Component
@@ -38,15 +39,16 @@ public class GroqClient {
 
     public GroqClient() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(15_000);  // 15s connect
-        factory.setReadTimeout(60_000);     // 60s read (LLM can be slow)
+        factory.setConnectTimeout(15_000); // 15s connect
+        factory.setReadTimeout(60_000); // 60s read (LLM can be slow)
         this.restTemplate = new RestTemplate(factory);
     }
 
     /**
      * Call Groq API with a prompt. Returns raw text response.
-     * @param prompt  user prompt
-     * @param maxTokens  response token limit
+     * 
+     * @param prompt    user prompt
+     * @param maxTokens response token limit
      */
     public String call(String prompt, int maxTokens) {
         try {
@@ -64,6 +66,8 @@ public class GroqClient {
             ResponseEntity<String> response = restTemplate.exchange(
                     apiUrl, HttpMethod.POST, entity, String.class);
 
+            if (response.getBody() == null)
+                throw new RuntimeException("AI returned empty response");
             JsonNode root = objectMapper.readTree(response.getBody());
             return root.path("choices").get(0).path("message").path("content").asText();
 
