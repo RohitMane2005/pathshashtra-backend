@@ -36,8 +36,13 @@ public class JsonCleaner {
         else if (s.startsWith("```")) s = s.substring(3);
         if (s.endsWith("```")) s = s.substring(0, s.length() - 3);
         s = s.trim();
-        // Find first { in case of any leading text
-        int start = s.indexOf('{');
+        // Find first { or [ in case of any leading text (handle both objects and arrays)
+        int objStart = s.indexOf('{');
+        int arrStart = s.indexOf('[');
+        int start = -1;
+        if (objStart >= 0 && arrStart >= 0) start = Math.min(objStart, arrStart);
+        else if (objStart >= 0) start = objStart;
+        else if (arrStart >= 0) start = arrStart;
         if (start > 0) s = s.substring(start);
         return s;
     }

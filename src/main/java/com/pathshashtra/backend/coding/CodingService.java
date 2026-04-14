@@ -176,11 +176,11 @@ public class CodingService {
         response.put("problemId", problem.getId());
         response.put("problem", parseJson(problem.getProblemJson()));
         response.put("submittedCode", problem.getSubmittedCode());
-        // FIX: Run JsonCleaner on feedbackJson when reading too, for backward
-        // compatibility with old records that were stored before the cleaning fix.
-        response.put("feedbackJson", parseJson(jsonCleaner.clean(problem.getFeedbackJson())));
+        // parseJson() already runs JsonCleaner internally for backward compatibility
+        // with old records stored before the cleaning fix — no need to double-clean.
+        response.put("feedbackJson", parseJson(problem.getFeedbackJson()));
         response.put("hintsUsed", problem.getHintsUsed());
-        response.put("status", problem.getStatus());
+        response.put("status", problem.getStatus().name());
         response.put("language", problem.getLanguage());
         response.put("topic", problem.getTopic());
         response.put("difficulty", problem.getDifficulty());
