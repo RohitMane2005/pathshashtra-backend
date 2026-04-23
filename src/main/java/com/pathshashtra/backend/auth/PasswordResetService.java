@@ -103,7 +103,7 @@ public class PasswordResetService {
         resetToken.setUsed(true);
         resetRepository.save(resetToken);
 
-        log.info("Password successfully reset for user {}", user.getId());
+        log.info("[AUDIT] Password successfully reset for userId={}", user.getId());
     }
 
     private void sendResetEmail(String toEmail, String token) {
@@ -113,7 +113,7 @@ public class PasswordResetService {
         String resetUrl = frontendUrl + "/reset-password?token=" + token;
 
         if (devMode) {
-            System.out.println("[DEV] Password reset URL for " + toEmail + ": " + resetUrl);
+            log.warn("[DEV] Password reset URL for {}: {}", toEmail, resetUrl);
             return;
         }
 

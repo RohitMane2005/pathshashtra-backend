@@ -5,13 +5,17 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.security.Key;
+import javax.crypto.SecretKey;
 import java.util.Date;
 
+/**
+ * JWT utility — updated for jjwt 0.12.x API.
+ * Deprecated parserBuilder() → Jwts.parser(), setSubject → subject(), etc.
+ */
 @Component
 public class JwtUtil {
 
-    private final Key key;
+    private final SecretKey key;
     private final long expiration;
 
     public JwtUtil(
@@ -21,7 +25,6 @@ public class JwtUtil {
         // FIX: Enforce minimum secret length at startup.
         // HMAC-SHA256 requires >= 256 bits (32 bytes). A short secret is weak
         // and jjwt will silently accept it, making tokens forgeable.
-        // 64 hex chars = 32 bytes = 256 bits minimum.
         byte[] secretBytes = secret.getBytes();
         if (secretBytes.length < 32) {
             throw new IllegalArgumentException(
@@ -37,29 +40,29 @@ public class JwtUtil {
 
     public String generateToken(String email) {
         return Jwts.builder()
-                .setSubject(email)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .subject(email)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(key)
                 .compact();
     }
 
     public String extractEmail(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(key)
+        return Jwts.parser()
+                .verifyWith(key)
                 .build()
-                .parseClaimsJws(token)
-                .getBody()
+                .parseSignedClaims(token)
+                .getPayload()
                 .getSubject();
     }
 
     public boolean isTokenValid(String token) {
         try {
-            Date expiry = Jwts.parserBuilder()
-                    .setSigningKey(key)
+            Date expiry = Jwts.parser()
+                    .verifyWith(key)
                     .build()
-                    .parseClaimsJws(token)
-                    .getBody()
+                    .parseSignedClaims(token)
+                    .getPayload()
                     .getExpiration();
             return !expiry.before(new Date());
         } catch (Exception e) {

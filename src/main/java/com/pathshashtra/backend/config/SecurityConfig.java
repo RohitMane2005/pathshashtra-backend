@@ -1,26 +1,32 @@
 package com.pathshashtra.backend.config;
 
+import com.pathshashtra.backend.ratelimit.GlobalRateLimitFilter;
 import com.pathshashtra.backend.security.JwtAuthenticationFilter;
 import com.pathshashtra.backend.security.JwtUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity          // FIX B1: Enable @PreAuthorize for RBAC
 public class SecurityConfig {
 
     private final JwtUtil jwtUtil;
+    private final GlobalRateLimitFilter globalRateLimitFilter;
 
-    public SecurityConfig(JwtUtil jwtUtil) {
+    public SecurityConfig(JwtUtil jwtUtil, GlobalRateLimitFilter globalRateLimitFilter) {
         this.jwtUtil = jwtUtil;
+        this.globalRateLimitFilter = globalRateLimitFilter;
     }
 
     @Bean
@@ -32,6 +38,20 @@ public class SecurityConfig {
             .formLogin(form -> form.disable())
             .httpBasic(basic -> basic.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+            // FIX E1: Security headers — HSTS, X-Frame-Options, X-Content-Type, Referrer-Policy, Permissions-Policy
+            .headers(headers -> headers
+                .httpStrictTransportSecurity(hsts -> hsts
+                    .includeSubDomains(true)
+                    .maxAgeInSeconds(31536000))            // 1 year
+                .frameOptions(frame -> frame.deny())       // Prevent clickjacking
+                .contentTypeOptions(cto -> {})             // X-Content-Type-Options: nosniff
+                .referrerPolicy(rp -> rp.policy(
+                    ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                .permissionsPolicy(pp -> pp.policy(
+                    "camera=(), microphone=(), geolocation=(), payment=()"))
+            )
+
             .exceptionHandling(ex -> ex.authenticationEntryPoint(
                     new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> auth
@@ -43,10 +63,11 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET,  "/api/auth/reset-password/validate").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/quiz/share/**").permitAll()
-                    .requestMatchers("/actuator/health").permitAll()
+                    // FIX D3: removed /actuator/health from public access — use /api/health instead
                     .anyRequest().authenticated()
             )
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(globalRateLimitFilter, JwtAuthenticationFilter.class);  // FIX D1
         return http.build();
     }
 }

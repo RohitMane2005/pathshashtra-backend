@@ -7,6 +7,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
@@ -15,23 +16,27 @@ public class CorsConfig {
     @Value("${frontend.url:http://localhost:3000}")
     private String frontendUrl;
 
+    @Value("${spring.profiles.active:default}")
+    private String activeProfile;
+
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // FIX: Use ONLY setAllowedOriginPatterns.
-        // Mixing setAllowedOrigins + setAllowedOriginPatterns causes Spring to
-        // ignore one of the lists depending on request origin, making CORS policy
-        // unpredictable and potentially bypassed for some origins.
-        // setAllowedOriginPatterns supports exact strings AND wildcards and
-        // is fully compatible with allowCredentials(true).
-        config.setAllowedOriginPatterns(List.of(
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost:*",
-                "https://*.vercel.app",
-                frontendUrl
-        ));
+        // FIX L1+L2: Restrict origins based on environment.
+        // Production: only the configured frontend URL.
+        // Development: allow localhost ports for dev convenience.
+        List<String> origins = new ArrayList<>();
+        origins.add(frontendUrl);
+
+        boolean isProd = "prod".equalsIgnoreCase(activeProfile) || "production".equalsIgnoreCase(activeProfile);
+        if (!isProd) {
+            // Dev-only origins — NEVER in production
+            origins.add("http://localhost:3000");
+            origins.add("http://localhost:5173");
+        }
+
+        config.setAllowedOriginPatterns(origins);
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 

@@ -114,7 +114,8 @@ public class UserService {
 
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("name", user.getName());
-            entry.put("email", user.getEmail());
+            // FIX B2: Do NOT expose email in leaderboard — PII leak
+            entry.put("userId", user.getId());
             entry.put("xp", xp);
             entry.put("problems", problems);
             entry.put("topics", topics);
@@ -151,6 +152,6 @@ public class UserService {
         savedItemRepository.deleteByUserId(userId);
         userRepository.delete(user);
 
-        log.info("Account deleted for user {}", userId);
+        log.info("[AUDIT] Account permanently deleted for userId={} email={}", userId, email);
     }
 }

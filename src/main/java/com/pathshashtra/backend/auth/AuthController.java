@@ -27,15 +27,6 @@ public class AuthController {
 
     /**
      * Register — rate limited 5/hour per IP to prevent account flood.
-     *
-     * FIX: register endpoint previously had no rate limit — an attacker could
-     * create unlimited accounts, exhausting the database and blocking legitimate
-     * signups.
-     *
-     * NOTE: The 409 "email already registered" response is intentional here.
-     * For a B2C student app, usability (telling users the email exists) outweighs
-     * the marginal user-enumeration risk at the registration stage.
-     * Login uses generic errors to protect the more sensitive credential check.
      */
     @PostMapping("/register")
     public ResponseEntity<?> register(
@@ -44,7 +35,6 @@ public class AuthController {
 
         String ip = getClientIp(httpRequest);
 
-        // FIX: rate limit registration — 5 accounts per hour per IP
         if (!rateLimiter.allowRegister(ip)) {
             log.warn("Register rate limit hit from ip={}", ip);
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -66,6 +56,7 @@ public class AuthController {
 
     /**
      * Login — rate limited per IP (10/min) AND per email (5/5min).
+     * FIX A1: Account lockout after 10 failed attempts in 15 minutes.
      * Uses generic error messages to prevent user enumeration.
      */
     @PostMapping("/login")
@@ -77,6 +68,13 @@ public class AuthController {
         request.setEmail(email);
         String ip = getClientIp(httpRequest);
 
+        // FIX A1: Check account lockout BEFORE rate limit
+        if (rateLimiter.isAccountLocked(email)) {
+            log.warn("Login blocked — account locked for email={} ip={}", email, ip);
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "Account temporarily locked due to too many failed attempts. Please try again in 15 minutes."));
+        }
+
         if (!rateLimiter.allowLogin(ip, email)) {
             log.warn("Login rate limit hit for email={} ip={}", email, ip);
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -84,18 +82,24 @@ public class AuthController {
         }
 
         AuthResponse response = authService.login(request);
+
+        if (response == null) {
+            // FIX A1: Record failed login attempt for lockout tracking
+            rateLimiter.recordFailedLogin(email);
+            log.warn("Failed login for email={} ip={}", email, ip);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Invalid email or password"));
+        }
+
+        // FIX A1: Clear failed login counter on success
+        rateLimiter.clearFailedLogins(email);
+        log.info("Successful login for email={} ip={}", email, ip);
         return ResponseEntity.ok(response);
     }
 
     /**
      * FIX: X-Forwarded-For is used only if spring.server.forward-headers-strategy=framework
-     * is set (it is, in application.properties). When deployed behind Render/Railway's
-     * reverse proxy, the real client IP is in X-Forwarded-For. Taking only [0] prevents
-     * IP spoofing via comma-appended fake IPs like "1.2.3.4, 5.6.7.8".
-     *
-     * Remaining risk: if app is directly exposed (no proxy), X-Forwarded-For is
-     * fully client-controlled. Mitigated by server.forward-headers-strategy=framework
-     * which only trusts the header when the request comes through a known proxy.
+     * is set (it is, in application.properties).
      */
     private String getClientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");

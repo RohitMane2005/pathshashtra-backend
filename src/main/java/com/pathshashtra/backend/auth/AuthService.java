@@ -39,13 +39,21 @@ public class AuthService {
         return new AuthResponse(jwtUtil.generateToken(user.getEmail()));
     }
 
-    /** Login — generic error message prevents user enumeration. */
+    /**
+     * Login — generic error message prevents user enumeration.
+     * Returns null on failure (caller handles lockout recording).
+     */
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+                .orElse(null);
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Invalid email or password");
+        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            return null; // FIX A1: return null instead of exception so controller can record failure
+        }
+
+        // Check soft-deleted accounts
+        if (user.getDeletedAt() != null) {
+            return null;
         }
 
         return new AuthResponse(jwtUtil.generateToken(user.getEmail()));

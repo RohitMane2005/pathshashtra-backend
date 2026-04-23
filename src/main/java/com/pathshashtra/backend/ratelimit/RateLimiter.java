@@ -1,5 +1,7 @@
 package com.pathshashtra.backend.ratelimit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -20,9 +22,16 @@ import java.util.concurrent.atomic.AtomicReference;
  *   and filling user tables.
  *
  * FIX 3 (memory): cleanup window extended to 24h to cover daily AI limits.
+ *
+ * FIX 4 (A1): Added account lockout — after 10 failed login attempts per email
+ *   in 15 minutes, the account is temporarily locked.
+ *
+ * FIX 5 (D1): Added global per-user API rate limit — 120 requests/min per user.
  */
 @Component
 public class RateLimiter {
+
+    private static final Logger log = LoggerFactory.getLogger(RateLimiter.class);
 
     private final ConcurrentHashMap<String, long[]> store = new ConcurrentHashMap<>();
     private static final long DAY = 86_400L;
@@ -81,12 +90,53 @@ public class RateLimiter {
     }
 
     /**
+     * FIX A1: Record a failed login attempt for account lockout tracking.
+     * After 10 failures in 15 minutes, isAccountLocked() returns true.
+     */
+    public void recordFailedLogin(String email) {
+        isAllowed("login_fail:" + email, Integer.MAX_VALUE, 900); // just records the timestamp
+        log.warn("Failed login attempt for email={}", email);
+    }
+
+    /**
+     * FIX A1: Check if an account is temporarily locked due to too many failures.
+     * Locks for 15 minutes after 10 consecutive failed attempts.
+     */
+    public boolean isAccountLocked(String email) {
+        String key = "login_fail:" + email;
+        long now = Instant.now().getEpochSecond();
+        long windowStart = now - 900; // 15-minute window
+        long[] ts = store.get(key);
+        if (ts == null) return false;
+        int failCount = 0;
+        for (long t : ts) if (t > windowStart) failCount++;
+        return failCount >= 10;
+    }
+
+    /**
+     * FIX A1: Clear failed login counter on successful login.
+     */
+    public void clearFailedLogins(String email) {
+        store.remove("login_fail:" + email);
+    }
+
+    /**
      * Register: 5 accounts/hour per IP.
      * Prevents account creation floods and DB exhaustion.
      * Note: this uses IP only since email changes with every request.
      */
     public boolean allowRegister(String ip) {
         return isAllowed("register_ip:" + ip, 5, 3600);
+    }
+
+    // ── FIX D1: Global per-user API rate limit ───────────────────────────
+
+    /**
+     * Global API rate limit: 120 requests per minute per authenticated user.
+     * Prevents data scraping and API abuse on non-AI endpoints.
+     */
+    public boolean allowApiRequest(String email) {
+        return isAllowed("api_global:" + email, 120, 60);
     }
 
     // ── Per-user AI daily limits ──────────────────────────────────────────
