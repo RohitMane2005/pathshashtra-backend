@@ -148,6 +148,11 @@ public class RateLimiter {
     public boolean allowCodingSubmit(String email)      { return isAllowed("ai_coding_submit:"  + email, 30, DAY); }
     public boolean allowStudyPlanGenerate(String email) { return isAllowed("ai_study:"          + email, 3,  DAY); }
 
+    /** Generic daily rate limit check for new features. */
+    public boolean allowRequest(String prefix, String email, int max) {
+        return isAllowed(prefix + email, max, DAY);
+    }
+
     public int remaining(String prefix, String email, int max) {
         long windowStart = Instant.now().getEpochSecond() - DAY;
         long[] ts = store.get(prefix + email);

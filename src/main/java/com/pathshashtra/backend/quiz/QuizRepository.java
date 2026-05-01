@@ -14,6 +14,9 @@ public interface QuizRepository extends JpaRepository<QuizSession, Long> {
     @Query("SELECT COUNT(q) FROM QuizSession q WHERE q.user.id = :userId AND q.status = 'COMPLETED'")
     long countCompletedByUserId(Long userId);
 
+    @Query("SELECT COUNT(q) FROM QuizSession q WHERE q.user.id = :userId")
+    long countByUserId(Long userId);
+
     /** FIX: grouped aggregate for leaderboard — avoids N+1 */
     @Query("SELECT q.user.id, COUNT(q) FROM QuizSession q WHERE q.status = 'COMPLETED' GROUP BY q.user.id")
     List<Object[]> countCompletedGroupedByUser();

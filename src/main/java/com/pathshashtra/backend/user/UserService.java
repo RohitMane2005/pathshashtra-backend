@@ -1,12 +1,23 @@
 package com.pathshashtra.backend.user;
 
+import com.pathshashtra.backend.achievement.AchievementRepository;
 import com.pathshashtra.backend.auth.PasswordResetRepository;
 import com.pathshashtra.backend.bookmark.SavedItemRepository;
 import com.pathshashtra.backend.career.CareerAssessmentRepository;
+import com.pathshashtra.backend.chat.ChatMessageRepository;
+import com.pathshashtra.backend.chat.ChatSessionRepository;
 import com.pathshashtra.backend.coding.CodingProblemRepository;
+import com.pathshashtra.backend.contest.ContestSubmissionRepository;
+import com.pathshashtra.backend.discussion.DiscussionPostRepository;
+import com.pathshashtra.backend.discussion.DiscussionReplyRepository;
+import com.pathshashtra.backend.discussion.DiscussionVoteRepository;
+import com.pathshashtra.backend.notes.NoteRepository;
+import com.pathshashtra.backend.notification.NotificationRepository;
 import com.pathshashtra.backend.profile.UserProfileRepository;
 import com.pathshashtra.backend.quiz.QuizRepository;
+import com.pathshashtra.backend.report.WeeklyReportRepository;
 import com.pathshashtra.backend.roadmap.RoadmapRepository;
+import com.pathshashtra.backend.social.FollowRepository;
 import com.pathshashtra.backend.study.StudyPlanRepository;
 import com.pathshashtra.backend.study.StudyTopicRepository;
 import org.slf4j.Logger;
@@ -33,6 +44,18 @@ public class UserService {
     private final UserActivityRepository activityRepository;
     private final SavedItemRepository savedItemRepository;
     private final CareerAssessmentRepository careerAssessmentRepository;
+    // New feature repositories
+    private final DiscussionPostRepository discussionPostRepository;
+    private final DiscussionReplyRepository discussionReplyRepository;
+    private final DiscussionVoteRepository discussionVoteRepository;
+    private final ContestSubmissionRepository contestSubmissionRepository;
+    private final ChatSessionRepository chatSessionRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final NoteRepository noteRepository;
+    private final NotificationRepository notificationRepository;
+    private final AchievementRepository achievementRepository;
+    private final FollowRepository followRepository;
+    private final WeeklyReportRepository weeklyReportRepository;
 
     public UserService(UserRepository userRepository,
             UserProfileRepository profileRepository,
@@ -44,7 +67,18 @@ public class UserService {
             PasswordResetRepository passwordResetRepository,
             UserActivityRepository activityRepository,
             SavedItemRepository savedItemRepository,
-            CareerAssessmentRepository careerAssessmentRepository) {
+            CareerAssessmentRepository careerAssessmentRepository,
+            DiscussionPostRepository discussionPostRepository,
+            DiscussionReplyRepository discussionReplyRepository,
+            DiscussionVoteRepository discussionVoteRepository,
+            ContestSubmissionRepository contestSubmissionRepository,
+            ChatSessionRepository chatSessionRepository,
+            ChatMessageRepository chatMessageRepository,
+            NoteRepository noteRepository,
+            NotificationRepository notificationRepository,
+            AchievementRepository achievementRepository,
+            FollowRepository followRepository,
+            WeeklyReportRepository weeklyReportRepository) {
         this.userRepository = userRepository;
         this.profileRepository = profileRepository;
         this.codingProblemRepository = codingProblemRepository;
@@ -56,6 +90,17 @@ public class UserService {
         this.activityRepository = activityRepository;
         this.savedItemRepository = savedItemRepository;
         this.careerAssessmentRepository = careerAssessmentRepository;
+        this.discussionPostRepository = discussionPostRepository;
+        this.discussionReplyRepository = discussionReplyRepository;
+        this.discussionVoteRepository = discussionVoteRepository;
+        this.contestSubmissionRepository = contestSubmissionRepository;
+        this.chatSessionRepository = chatSessionRepository;
+        this.chatMessageRepository = chatMessageRepository;
+        this.noteRepository = noteRepository;
+        this.notificationRepository = notificationRepository;
+        this.achievementRepository = achievementRepository;
+        this.followRepository = followRepository;
+        this.weeklyReportRepository = weeklyReportRepository;
     }
 
     public User findByEmail(String email) {
@@ -140,6 +185,7 @@ public class UserService {
         User user = findByEmail(email);
         Long userId = user.getId();
 
+        // Original cleanups
         careerAssessmentRepository.deleteByUserId(userId);
         studyTopicRepository.deleteByStudyPlanUserId(userId);
         studyPlanRepository.deleteByUserId(userId);
@@ -150,6 +196,20 @@ public class UserService {
         passwordResetRepository.deleteByUserId(userId);
         activityRepository.deleteByUserId(userId);
         savedItemRepository.deleteByUserId(userId);
+
+        // New feature cleanups
+        discussionVoteRepository.deleteByUserId(userId);
+        discussionReplyRepository.deleteByUserId(userId);
+        discussionPostRepository.deleteByUserId(userId);
+        contestSubmissionRepository.deleteByUserId(userId);
+        chatMessageRepository.deleteByUserId(userId);
+        chatSessionRepository.deleteByUserId(userId);
+        noteRepository.deleteByUserId(userId);
+        notificationRepository.deleteByUserId(userId);
+        achievementRepository.deleteByUserId(userId);
+        followRepository.deleteByFollowerIdOrFollowingId(userId, userId);
+        weeklyReportRepository.deleteByUserId(userId);
+
         userRepository.delete(user);
 
         log.info("[AUDIT] Account permanently deleted for userId={} email={}", userId, email);
