@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -22,13 +23,15 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Value("${frontend.url}")
     private String frontendUrl;
 
-    public OAuth2LoginSuccessHandler(JwtUtil jwtUtil, UserRepository userRepository) {
+    public OAuth2LoginSuccessHandler(JwtUtil jwtUtil, UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.jwtUtil = jwtUtil;
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -53,9 +56,10 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             user.setEmail(email);
             user.setName(name);
             user.setRole("STUDENT");
+            user.setAuthProvider("GOOGLE");
             // Set a dummy password for OAuth users since they don't use it, but DB might require something
             // Ensure no one can log in using this password
-            user.setPassword(UUID.randomUUID().toString());
+            user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
             userRepository.save(user);
         }
 

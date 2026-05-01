@@ -16,6 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
 
 @Configuration
 @EnableWebSecurity
@@ -33,6 +34,11 @@ public class SecurityConfig {
     }
 
     @Bean
+    public HttpSessionOAuth2AuthorizationRequestRepository authorizationRequestRepository() {
+        return new HttpSessionOAuth2AuthorizationRequestRepository();
+    }
+
+    @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtil);
         http
@@ -40,7 +46,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .formLogin(form -> form.disable())
             .httpBasic(basic -> basic.disable())
-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
 
             // FIX E1: Security headers — HSTS, X-Frame-Options, X-Content-Type, Referrer-Policy, Permissions-Policy
             .headers(headers -> headers
@@ -71,6 +77,9 @@ public class SecurityConfig {
                     .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
+                    .authorizationEndpoint(a -> a
+                        .authorizationRequestRepository(authorizationRequestRepository())
+                    )
                     .successHandler(oAuth2LoginSuccessHandler)
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

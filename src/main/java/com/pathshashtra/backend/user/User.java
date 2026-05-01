@@ -30,6 +30,8 @@ public class User {
 
     private String role = "STUDENT";
 
+    private String authProvider = "LOCAL";
+
     /** Soft-delete timestamp. Null = active account. */
     private LocalDateTime deletedAt;
 }

@@ -51,6 +51,10 @@ public class AuthService {
             return null; // FIX A1: return null instead of exception so controller can record failure
         }
 
+        if ("GOOGLE".equals(user.getAuthProvider())) {
+            throw new IllegalArgumentException("Please login with Google");
+        }
+
         // Check soft-deleted accounts
         if (user.getDeletedAt() != null) {
             return null;
