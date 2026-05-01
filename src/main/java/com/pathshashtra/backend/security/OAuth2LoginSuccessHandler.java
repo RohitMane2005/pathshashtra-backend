@@ -39,11 +39,21 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                                         Authentication authentication) throws IOException, ServletException {
         
         OAuth2AuthenticationToken oAuth2AuthenticationToken = (OAuth2AuthenticationToken) authentication;
+        String registrationId = oAuth2AuthenticationToken.getAuthorizedClientRegistrationId();
         OAuth2User oAuth2User = oAuth2AuthenticationToken.getPrincipal();
         Map<String, Object> attributes = oAuth2User.getAttributes();
 
         String email = (String) attributes.get("email");
         String name = (String) attributes.get("name");
+
+        if (email == null) {
+            String login = (String) attributes.get("login");
+            email = login != null ? login + "@github.com" : oAuth2User.getName() + "@provider.com";
+        }
+        if (name == null) {
+            name = (String) attributes.get("login");
+            if (name == null) name = "User";
+        }
 
         Optional<User> userOptional = userRepository.findByEmail(email);
         User user;
@@ -56,7 +66,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             user.setEmail(email);
             user.setName(name);
             user.setRole("STUDENT");
-            user.setAuthProvider("GOOGLE");
+            user.setAuthProvider(registrationId.toUpperCase());
             // Set a dummy password for OAuth users since they don't use it, but DB might require something
             // Ensure no one can log in using this password
             user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
