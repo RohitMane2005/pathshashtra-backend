@@ -3,6 +3,7 @@ package com.pathshashtra.backend.config;
 import com.pathshashtra.backend.ratelimit.GlobalRateLimitFilter;
 import com.pathshashtra.backend.security.JwtAuthenticationFilter;
 import com.pathshashtra.backend.security.JwtUtil;
+import com.pathshashtra.backend.security.OAuth2LoginSuccessHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -23,10 +24,12 @@ public class SecurityConfig {
 
     private final JwtUtil jwtUtil;
     private final GlobalRateLimitFilter globalRateLimitFilter;
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
 
-    public SecurityConfig(JwtUtil jwtUtil, GlobalRateLimitFilter globalRateLimitFilter) {
+    public SecurityConfig(JwtUtil jwtUtil, GlobalRateLimitFilter globalRateLimitFilter, OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler) {
         this.jwtUtil = jwtUtil;
         this.globalRateLimitFilter = globalRateLimitFilter;
+        this.oAuth2LoginSuccessHandler = oAuth2LoginSuccessHandler;
     }
 
     @Bean
@@ -63,8 +66,12 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET,  "/api/auth/reset-password/validate").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/quiz/share/**").permitAll()
+                    .requestMatchers("/login/oauth2/**", "/oauth2/**").permitAll() // Allow OAuth2 endpoints
                     // FIX D3: removed /actuator/health from public access — use /api/health instead
                     .anyRequest().authenticated()
+            )
+            .oauth2Login(oauth2 -> oauth2
+                    .successHandler(oAuth2LoginSuccessHandler)
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(globalRateLimitFilter, JwtAuthenticationFilter.class);  // FIX D1
