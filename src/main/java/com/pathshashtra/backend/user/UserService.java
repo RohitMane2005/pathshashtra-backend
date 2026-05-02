@@ -146,9 +146,9 @@ public class UserService {
         Map<Long, Long> topicMap = toMap(topicCounts);
         Map<Long, Long> quizMap = toMap(quizCounts);
 
-        List<User> users = userRepository.findAll().stream()
-                .filter(u -> u.getDeletedAt() == null)
-                .toList();
+        // FIX BUG 12: Use findAllActive() instead of findAll() + in-memory filter.
+        // Filters soft-deleted users at the DB level.
+        List<User> users = userRepository.findAllActive();
 
         List<Map<String, Object>> board = new ArrayList<>();
         for (User user : users) {

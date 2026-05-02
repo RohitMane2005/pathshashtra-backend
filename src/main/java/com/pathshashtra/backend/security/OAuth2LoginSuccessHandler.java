@@ -60,6 +60,13 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
         if (userOptional.isPresent()) {
             user = userOptional.get();
+            // FIX BUG 6: Update authProvider when existing user logs in via OAuth.
+            // Prevents dual-auth (local + OAuth) and keeps the field accurate.
+            String oauthProvider = registrationId.toUpperCase();
+            if ("LOCAL".equals(user.getAuthProvider())) {
+                user.setAuthProvider(oauthProvider);
+                userRepository.save(user);
+            }
         } else {
             // Register new user
             user = new User();

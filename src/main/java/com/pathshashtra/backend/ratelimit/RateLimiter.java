@@ -164,13 +164,22 @@ public class RateLimiter {
 
     // ── Cleanup ───────────────────────────────────────────────────────────
 
-    /** Evict entries whose newest timestamp is older than 24 hours. Runs every 10 min. */
+    /**
+     * Evict entries whose newest timestamp is older than 24 hours. Runs every 10 min.
+     * FIX BUG 3: Check the MAXIMUM timestamp in the array, not just the last element.
+     * Under concurrent ConcurrentHashMap.compute() calls, append order is not guaranteed.
+     */
     @Scheduled(fixedDelay = 600_000)
     public void evictStaleEntries() {
         long cutoff = Instant.now().getEpochSecond() - DAY;
         store.entrySet().removeIf(e -> {
             long[] ts = e.getValue();
-            return ts == null || ts.length == 0 || ts[ts.length - 1] < cutoff;
+            if (ts == null || ts.length == 0) return true;
+            long max = ts[0];
+            for (int i = 1; i < ts.length; i++) {
+                if (ts[i] > max) max = ts[i];
+            }
+            return max < cutoff;
         });
     }
 }

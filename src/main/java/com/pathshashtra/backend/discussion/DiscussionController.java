@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.discussion;
 
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -7,6 +8,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * FIX BUG 7: Replaced raw Map request bodies with validated DTOs.
+ * All user-submitted content now has @NotBlank and @Size constraints,
+ * preventing NPE and enforcing input limits.
+ */
 @RestController
 @RequestMapping("/api/discussions")
 public class DiscussionController {
@@ -28,9 +34,9 @@ public class DiscussionController {
 
     @PostMapping
     public ResponseEntity<DiscussionPost> create(
-            @RequestBody Map<String, String> body, Authentication auth) {
+            @Valid @RequestBody CreatePostRequest request, Authentication auth) {
         return ResponseEntity.ok(service.createPost(
-                auth.getName(), body.get("title"), body.get("content"), body.get("tags")));
+                auth.getName(), request.getTitle(), request.getContent(), request.getTags()));
     }
 
     @GetMapping("/{id}")
@@ -40,8 +46,8 @@ public class DiscussionController {
 
     @PostMapping("/{id}/reply")
     public ResponseEntity<DiscussionReply> addReply(
-            @PathVariable Long id, @RequestBody Map<String, String> body, Authentication auth) {
-        return ResponseEntity.ok(service.addReply(auth.getName(), id, body.get("content")));
+            @PathVariable Long id, @Valid @RequestBody AddReplyRequest request, Authentication auth) {
+        return ResponseEntity.ok(service.addReply(auth.getName(), id, request.getContent()));
     }
 
     @PostMapping("/{id}/upvote")

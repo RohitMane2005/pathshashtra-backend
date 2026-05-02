@@ -36,7 +36,10 @@ public class CorsConfig {
             origins.add("http://localhost:5173");
         }
 
-        config.setAllowedOriginPatterns(origins);
+        // FIX BUG 13: Use setAllowedOrigins() for exact URL matching.
+        // setAllowedOriginPatterns() supports globs which could accidentally
+        // match unintended origins if a pattern-like string is added.
+        config.setAllowedOrigins(origins);
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 

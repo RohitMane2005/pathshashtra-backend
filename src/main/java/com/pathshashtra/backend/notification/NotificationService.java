@@ -59,17 +59,15 @@ public class NotificationService {
         });
     }
 
+    /**
+     * FIX BUG 10: Single bulk update marks ALL unread notifications as read.
+     * Previously only processed the first 100 via PageRequest, silently
+     * leaving remaining notifications unread.
+     */
     @Transactional
     public void markAllRead(String email) {
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        Page<Notification> unread = notifRepo.findByUserIdOrderByCreatedAtDesc(
-                user.getId(), PageRequest.of(0, 100));
-        for (Notification n : unread) {
-            if (!n.isRead()) {
-                n.setRead(true);
-                notifRepo.save(n);
-            }
-        }
+        notifRepo.markAllReadByUserId(user.getId());
     }
 }

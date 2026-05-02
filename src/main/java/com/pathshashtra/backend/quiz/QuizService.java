@@ -121,13 +121,43 @@ public class QuizService {
         return parseQuizResult(session.getResultJson());
     }
 
-    /** Same as submitQuiz but also returns the shareToken in the response. */
+    /**
+     * FIX BUG 14: Inlined submission logic to avoid double DB lookups.
+     * Previously called submitQuiz() then re-fetched the same session and user.
+     * Now fetches each resource exactly once.
+     */
     @Transactional
     public Map<String, Object> submitQuizWithToken(String email, QuizSubmitRequest request) {
-        QuizResult result = submitQuiz(email, request);
+        User user = getUser(email);
         QuizSession session = quizRepository
-                .findByIdAndUserId(request.getSessionId(), getUser(email).getId())
-                .orElseThrow(() -> new RuntimeException("Session not found"));
+                .findByIdAndUserId(request.getSessionId(), user.getId())
+                .orElseThrow(() -> new RuntimeException("Quiz session not found"));
+
+        if (session.getStatus() == QuizSession.QuizStatus.COMPLETED) {
+            throw new RuntimeException("Quiz already completed");
+        }
+
+        try {
+            session.setAnswersJson(objectMapper.writeValueAsString(request.getAnswers()));
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to save answers");
+        }
+
+        String profileContext = buildProfileContext(user);
+        String resultJson = claudeApiService.analyzeQuizAnswers(
+                profileContext, session.getQuestionsJson(), session.getAnswersJson());
+
+        session.setResultJson(resultJson);
+        session.setStatus(QuizSession.QuizStatus.COMPLETED);
+        session.setCompletedAt(LocalDateTime.now());
+
+        byte[] bytes = new byte[16];
+        new SecureRandom().nextBytes(bytes);
+        session.setShareToken(Base64.getUrlEncoder().withoutPadding().encodeToString(bytes));
+        quizRepository.save(session);
+
+        QuizResult result = parseQuizResult(resultJson);
+
         Map<String, Object> resp = new java.util.LinkedHashMap<>();
         resp.put("shareToken", session.getShareToken());
         resp.put("summary", result.getSummary());

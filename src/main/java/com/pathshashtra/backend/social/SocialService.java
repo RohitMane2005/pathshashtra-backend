@@ -105,18 +105,31 @@ public class SocialService {
         return result;
     }
 
+    /**
+     * FIX BUG 4: DB-level search replaces findAll() full table scan.
+     * Follow status is batch-checked with a single query instead of N+1.
+     */
     public List<Map<String, Object>> searchUsers(String email, String query) {
         User me = userRepo.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        return userRepo.findAll().stream()
-                .filter(u -> u.getDeletedAt() == null && !u.getId().equals(me.getId()))
-                .filter(u -> u.getName() != null && u.getName().toLowerCase().contains(query.toLowerCase()))
-                .limit(20)
+
+        List<User> matched = userRepo.searchByName(
+                query, me.getId(), org.springframework.data.domain.PageRequest.of(0, 20));
+
+        // Batch-check follow status for all matched users in one query
+        List<Long> matchedIds = matched.stream().map(User::getId).toList();
+        Set<Long> followingIds = matchedIds.isEmpty() ? Set.of()
+                : followRepo.findByFollowerId(me.getId()).stream()
+                    .map(Follow::getFollowingId)
+                    .filter(matchedIds::contains)
+                    .collect(Collectors.toSet());
+
+        return matched.stream()
                 .map(u -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("userId", u.getId());
                     m.put("name", u.getName());
-                    m.put("isFollowing", followRepo.existsByFollowerIdAndFollowingId(me.getId(), u.getId()));
+                    m.put("isFollowing", followingIds.contains(u.getId()));
                     return m;
                 })
                 .collect(Collectors.toList());

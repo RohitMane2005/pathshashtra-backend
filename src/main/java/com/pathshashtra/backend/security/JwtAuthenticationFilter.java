@@ -76,10 +76,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    /**
+     * FIX BUG 11: Use Map + ObjectMapper for safe JSON serialization.
+     * String concatenation could allow JSON injection if message ever
+     * comes from user input or exception messages containing quotes.
+     */
     private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json");
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write("{\"error\":\"" + message + "\",\"status\":401}");
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        response.getWriter().write(mapper.writeValueAsString(
+                java.util.Map.of("error", message, "status", 401)));
     }
 }

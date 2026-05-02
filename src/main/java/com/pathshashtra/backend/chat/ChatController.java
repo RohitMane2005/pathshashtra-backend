@@ -47,12 +47,25 @@ public class ChatController {
     @PostMapping("/send")
     public ResponseEntity<?> sendMessage(@RequestBody Map<String, Object> body, Authentication auth) {
         String email = auth.getName();
+
+        // FIX BUG 8: Validate content before consuming rate limit token or API call
+        String content = body.get("content") != null ? body.get("content").toString().trim() : "";
+        if (content.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Message content cannot be empty"));
+        }
+
         if (!rateLimiter.allowRequest("ai_chat:", email, 50)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(Map.of("error", "Daily chat limit reached (50 messages/day)."));
         }
-        Long sessionId = Long.valueOf(body.get("sessionId").toString());
-        String content = (String) body.get("content");
+
+        Object sessionIdObj = body.get("sessionId");
+        if (sessionIdObj == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "sessionId is required"));
+        }
+        Long sessionId = Long.valueOf(sessionIdObj.toString());
         return ResponseEntity.ok(chatService.sendMessage(email, sessionId, content));
     }
 }

@@ -1,5 +1,7 @@
 package com.pathshashtra.backend.common;
 
+import com.pathshashtra.backend.exception.ServiceUnavailableException;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -73,7 +75,7 @@ public class GroqClient {
 
         } catch (Exception e) {
             log.error("Groq API call failed: {}", e.getMessage());
-            throw new RuntimeException("AI service temporarily unavailable. Please try again.");
+            throw new ServiceUnavailableException("AI service temporarily unavailable. Please try again.");
         }
     }
 }

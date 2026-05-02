@@ -28,21 +28,25 @@ public class ContestService {
         this.userRepo = userRepo;
     }
 
+    /**
+     * FIX BUG 5: Status is now computed on-the-fly from startTime/endTime
+     * instead of writing to the DB in a GET handler. This is side-effect-free,
+     * follows REST semantics, and avoids transactional issues.
+     */
     public List<Contest> listContests() {
         List<Contest> contests = contestRepo.findAllByOrderByStartTimeDesc();
         LocalDateTime now = LocalDateTime.now();
-        // Auto-update statuses
         for (Contest c : contests) {
-            String newStatus;
-            if (now.isBefore(c.getStartTime())) newStatus = "UPCOMING";
-            else if (now.isAfter(c.getEndTime())) newStatus = "ENDED";
-            else newStatus = "ACTIVE";
-            if (!newStatus.equals(c.getStatus())) {
-                c.setStatus(newStatus);
-                contestRepo.save(c);
-            }
+            c.setStatus(deriveStatus(c, now));
         }
         return contests;
+    }
+
+    /** Derive contest status from time bounds — pure function, no DB writes. */
+    private String deriveStatus(Contest c, LocalDateTime now) {
+        if (now.isBefore(c.getStartTime())) return "UPCOMING";
+        if (now.isAfter(c.getEndTime())) return "ENDED";
+        return "ACTIVE";
     }
 
     public Map<String, Object> getContest(Long id) {

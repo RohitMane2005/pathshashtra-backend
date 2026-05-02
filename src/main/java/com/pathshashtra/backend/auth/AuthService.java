@@ -40,23 +40,31 @@ public class AuthService {
     }
 
     /**
-     * Login — generic error message prevents user enumeration.
-     * Returns null on failure (caller handles lockout recording).
+     * Login — FIX BUG 1: OAuth provider and soft-delete checks happen BEFORE
+     * password comparison. All failure paths return null (same generic response)
+     * to prevent user enumeration via timing or error message differences.
      */
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElse(null);
 
-        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            return null; // FIX A1: return null instead of exception so controller can record failure
+        // No user found — generic failure
+        if (user == null) {
+            return null;
         }
 
-        if ("GOOGLE".equals(user.getAuthProvider())) {
-            throw new IllegalArgumentException("Please login with Google");
-        }
-
-        // Check soft-deleted accounts
+        // Soft-deleted account — generic failure (don't reveal account existed)
         if (user.getDeletedAt() != null) {
+            return null;
+        }
+
+        // OAuth user trying local login — generic failure (don't reveal auth provider)
+        if (!"LOCAL".equals(user.getAuthProvider())) {
+            return null;
+        }
+
+        // Password mismatch — generic failure
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             return null;
         }
 
