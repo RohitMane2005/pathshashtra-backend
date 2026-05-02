@@ -3,6 +3,7 @@ package com.pathshashtra.backend.config;
 import com.pathshashtra.backend.ratelimit.GlobalRateLimitFilter;
 import com.pathshashtra.backend.security.JwtAuthenticationFilter;
 import com.pathshashtra.backend.security.JwtUtil;
+import com.pathshashtra.backend.security.OAuth2LoginFailureHandler;
 import com.pathshashtra.backend.security.OAuth2LoginSuccessHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,11 +27,15 @@ public class SecurityConfig {
     private final JwtUtil jwtUtil;
     private final GlobalRateLimitFilter globalRateLimitFilter;
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+    private final OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
 
-    public SecurityConfig(JwtUtil jwtUtil, GlobalRateLimitFilter globalRateLimitFilter, OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler) {
+    public SecurityConfig(JwtUtil jwtUtil, GlobalRateLimitFilter globalRateLimitFilter,
+                          OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler,
+                          OAuth2LoginFailureHandler oAuth2LoginFailureHandler) {
         this.jwtUtil = jwtUtil;
         this.globalRateLimitFilter = globalRateLimitFilter;
         this.oAuth2LoginSuccessHandler = oAuth2LoginSuccessHandler;
+        this.oAuth2LoginFailureHandler = oAuth2LoginFailureHandler;
     }
 
     @Bean
@@ -81,6 +86,7 @@ public class SecurityConfig {
                         .authorizationRequestRepository(authorizationRequestRepository())
                     )
                     .successHandler(oAuth2LoginSuccessHandler)
+                    .failureHandler(oAuth2LoginFailureHandler)
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(globalRateLimitFilter, JwtAuthenticationFilter.class);  // FIX D1
