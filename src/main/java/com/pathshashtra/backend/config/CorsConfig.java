@@ -36,10 +36,11 @@ public class CorsConfig {
             origins.add("http://localhost:5173");
         }
 
-        // FIX BUG 13: Use setAllowedOrigins() for exact URL matching.
-        // setAllowedOriginPatterns() supports globs which could accidentally
-        // match unintended origins if a pattern-like string is added.
-        config.setAllowedOrigins(origins);
+        // setAllowedOriginPatterns() is REQUIRED when allowCredentials(true) is set.
+        // Spring Boot 3.x rejects setAllowedOrigins() + credentials with an
+        // IllegalArgumentException. Passing exact URLs (not globs) here still
+        // performs strict origin matching — no wildcard risk.
+        config.setAllowedOriginPatterns(origins);
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 
