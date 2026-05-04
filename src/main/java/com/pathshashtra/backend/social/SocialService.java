@@ -113,8 +113,15 @@ public class SocialService {
         User me = userRepo.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // FIX M5: Truncate search input to prevent oversized LIKE queries
+        if (query == null || query.isBlank()) return List.of();
+        String safeQuery = query.trim();
+        if (safeQuery.length() > 100) safeQuery = safeQuery.substring(0, 100);
+        // FIX M6: Escape SQL wildcards to prevent matching every user with '%' or '_'
+        safeQuery = safeQuery.replace("%", "\\%").replace("_", "\\_");
+
         List<User> matched = userRepo.searchByName(
-                query, me.getId(), org.springframework.data.domain.PageRequest.of(0, 20));
+                safeQuery, me.getId(), org.springframework.data.domain.PageRequest.of(0, 20));
 
         // Batch-check follow status for all matched users in one query
         List<Long> matchedIds = matched.stream().map(User::getId).toList();

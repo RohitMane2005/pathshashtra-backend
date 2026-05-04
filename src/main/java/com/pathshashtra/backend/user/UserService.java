@@ -22,6 +22,7 @@ import com.pathshashtra.backend.study.StudyPlanRepository;
 import com.pathshashtra.backend.study.StudyTopicRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,6 +57,7 @@ public class UserService {
     private final AchievementRepository achievementRepository;
     private final FollowRepository followRepository;
     private final WeeklyReportRepository weeklyReportRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public UserService(UserRepository userRepository,
             UserProfileRepository profileRepository,
@@ -78,7 +80,8 @@ public class UserService {
             NotificationRepository notificationRepository,
             AchievementRepository achievementRepository,
             FollowRepository followRepository,
-            WeeklyReportRepository weeklyReportRepository) {
+            WeeklyReportRepository weeklyReportRepository,
+            PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.profileRepository = profileRepository;
         this.codingProblemRepository = codingProblemRepository;
@@ -101,6 +104,7 @@ public class UserService {
         this.achievementRepository = achievementRepository;
         this.followRepository = followRepository;
         this.weeklyReportRepository = weeklyReportRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public User findByEmail(String email) {
@@ -180,9 +184,22 @@ public class UserService {
         return map;
     }
 
+    /**
+     * FIX H3: Verify password before permanent account deletion.
+     * OAuth users (authProvider != LOCAL) are allowed to delete without
+     * password verification since they never set a password.
+     */
     @Transactional
-    public void deleteAccount(String email) {
+    public void deleteAccount(String email, String password) {
         User user = findByEmail(email);
+
+        // For LOCAL users: verify password before deletion
+        if ("LOCAL".equals(user.getAuthProvider())) {
+            if (!passwordEncoder.matches(password, user.getPassword())) {
+                throw new RuntimeException("Incorrect password. Account deletion cancelled.");
+            }
+        }
+
         Long userId = user.getId();
 
         // Original cleanups

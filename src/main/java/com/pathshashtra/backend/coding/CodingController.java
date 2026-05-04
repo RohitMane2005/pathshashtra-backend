@@ -83,9 +83,11 @@ public class CodingController {
     public ResponseEntity<?> getRoadmap(
             @RequestParam(defaultValue = "Campus Placement") String goal, Authentication auth) {
         String email = auth.getName();
-        if (!rateLimiter.allowCodingGenerate(email)) {
+        // FIX L5: Use dedicated roadmap rate limit (5/day) instead of sharing
+        // the problem-generation bucket (20/day).
+        if (!rateLimiter.allowRoadmapGenerate(email)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(Map.of("error", "Daily limit reached."));
+                    .body(Map.of("error", "Daily roadmap limit reached (5/day)."));
         }
         return ResponseEntity.ok(codingService.getDsaRoadmap(email, goal));
     }

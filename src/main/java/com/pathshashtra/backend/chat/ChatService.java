@@ -1,12 +1,15 @@
 package com.pathshashtra.backend.chat;
 
-import com.pathshashtra.backend.ratelimit.RateLimiter;
+import com.pathshashtra.backend.exception.ServiceUnavailableException;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -22,7 +25,12 @@ public class ChatService {
     private final ChatSessionRepository sessionRepo;
     private final ChatMessageRepository messageRepo;
     private final UserRepository userRepo;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper objectMapper;
+    /**
+     * FIX M1: Use a RestTemplate with proper timeouts instead of the default
+     * infinite-timeout RestTemplate that could block threads forever.
+     */
+    private final RestTemplate restTemplate;
 
     @Value("${groq.api.key}")
     private String groqApiKey;
@@ -43,10 +51,17 @@ public class ChatService {
 
     public ChatService(ChatSessionRepository sessionRepo,
                        ChatMessageRepository messageRepo,
-                       UserRepository userRepo) {
+                       UserRepository userRepo,
+                       ObjectMapper objectMapper) {
         this.sessionRepo = sessionRepo;
         this.messageRepo = messageRepo;
         this.userRepo = userRepo;
+        this.objectMapper = objectMapper;
+        // FIX M1: Configure timeouts to prevent thread exhaustion
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(15_000);
+        factory.setReadTimeout(60_000);
+        this.restTemplate = new RestTemplate(factory);
     }
 
     public List<ChatSession> getSessions(String email) {
@@ -157,16 +172,18 @@ public class ChatService {
             body.put("temperature", 0.7);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-            ResponseEntity<Map> response = restTemplate.exchange(groqApiUrl, HttpMethod.POST, entity, Map.class);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    groqApiUrl, HttpMethod.POST, entity, String.class);
 
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.getBody().get("choices");
-            @SuppressWarnings("unchecked")
-            Map<String, String> message = (Map<String, String>) choices.get(0).get("message");
-            return message.get("content");
+            if (response.getBody() == null)
+                throw new RuntimeException("AI returned empty response");
+            JsonNode root = objectMapper.readTree(response.getBody());
+            return root.path("choices").get(0).path("message").path("content").asText();
         } catch (Exception e) {
             log.error("Groq API call failed for chat: {}", e.getMessage());
-            return "I'm having trouble connecting right now. Please try again in a moment. 🤖";
+            throw new ServiceUnavailableException(
+                    "AI service temporarily unavailable. Please try again.");
         }
     }
 }
+

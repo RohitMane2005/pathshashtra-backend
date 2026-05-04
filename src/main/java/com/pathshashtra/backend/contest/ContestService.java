@@ -84,7 +84,11 @@ public class ContestService {
         Contest contest = contestRepo.findById(contestId)
                 .orElseThrow(() -> new RuntimeException("Contest not found"));
 
-        if (!"ACTIVE".equals(contest.getStatus())) {
+        // FIX C2: Use deriveStatus() instead of stale DB field.
+        // contest.getStatus() holds the value from creation time ("UPCOMING") and is never
+        // updated by listContests(). deriveStatus() computes the real-time status.
+        String currentStatus = deriveStatus(contest, LocalDateTime.now());
+        if (!"ACTIVE".equals(currentStatus)) {
             throw new RuntimeException("Contest is not active");
         }
 

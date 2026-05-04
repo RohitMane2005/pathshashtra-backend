@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.notes;
 
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -7,6 +8,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * FIX C3: Uses NoteRequest DTO instead of binding directly to the Note entity.
+ */
 @RestController
 @RequestMapping("/api/notes")
 public class NoteController {
@@ -26,13 +30,13 @@ public class NoteController {
     }
 
     @PostMapping
-    public ResponseEntity<Note> create(@RequestBody Note note, Authentication auth) {
-        return ResponseEntity.ok(service.createNote(auth.getName(), note));
+    public ResponseEntity<Note> create(@Valid @RequestBody NoteRequest request, Authentication auth) {
+        return ResponseEntity.ok(service.createNote(auth.getName(), request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Note> update(@PathVariable Long id, @RequestBody Note note, Authentication auth) {
-        return ResponseEntity.ok(service.updateNote(auth.getName(), id, note));
+    public ResponseEntity<Note> update(@PathVariable Long id, @Valid @RequestBody NoteRequest request, Authentication auth) {
+        return ResponseEntity.ok(service.updateNote(auth.getName(), id, request));
     }
 
     @DeleteMapping("/{id}")
@@ -46,3 +50,4 @@ public class NoteController {
         return ResponseEntity.ok(service.togglePin(auth.getName(), id));
     }
 }
+

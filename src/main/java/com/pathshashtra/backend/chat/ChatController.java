@@ -54,6 +54,11 @@ public class ChatController {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "Message content cannot be empty"));
         }
+        // FIX H4: Limit message length to prevent DB bloat and Groq API token overflow
+        if (content.length() > 5000) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Message too long. Maximum 5000 characters."));
+        }
 
         if (!rateLimiter.allowRequest("ai_chat:", email, 50)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

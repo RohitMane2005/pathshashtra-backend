@@ -170,7 +170,7 @@ public class CodingService {
         log.debug("Loading problem {} for user {} (id={})", problemId, email, user.getId());
         CodingProblem problem = problemRepository
                 .findByIdAndUserId(problemId, user.getId())
-                .orElseThrow(() -> new RuntimeException("Problem not found: id=" + problemId + " for user=" + email));
+                .orElseThrow(() -> new RuntimeException("Problem not found"));
 
         Map<String, Object> response = new HashMap<>();
         response.put("problemId", problem.getId());

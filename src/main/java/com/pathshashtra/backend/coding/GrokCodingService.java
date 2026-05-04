@@ -13,11 +13,25 @@ public class GrokCodingService {
     this.groqClient = groqClient;
   }
 
+  /**
+   * FIX C1: Enhanced sanitization to defend against prompt injection.
+   * Strips control characters, markdown fences, and prompt-terminating patterns.
+   * Truncates to maxLen to prevent token-bomb attacks.
+   */
+  private String sanitize(String input, int maxLen) {
+    if (input == null) return "";
+    String s = input
+        .replace("\\", "").replace("\"", "").replace("'", "")
+        .replace("`", "").replace("<", "").replace(">", "")
+        .replaceAll("(?i)(ignore|forget|disregard)\\s+(above|previous|all)", "[filtered]")
+        .replaceAll("```", "")
+        .strip();
+    return s.length() > maxLen ? s.substring(0, maxLen) : s;
+  }
+
+  /** Convenience overload for short metadata fields. */
   private String sanitize(String input) {
-    if (input == null)
-      return "";
-    return input.replace("\\", "").replace("\"", "").replace("'", "")
-        .replace("`", "").replace("<", "").replace(">", "").strip();
+    return sanitize(input, 200);
   }
 
   public String generateProblem(String topic, String difficulty, String language) {
@@ -57,7 +71,13 @@ public class GrokCodingService {
     return groqClient.call(prompt, 2000);
   }
 
+  /**
+   * FIX C1: Sanitize currentCode before injecting into prompt.
+   * Truncate problemJson to 4000 chars to prevent token overflow.
+   */
   public String generateHint(String problemJson, String currentCode, int hintsUsed) {
+    String safeProblem = sanitize(problemJson, 4000);
+    String safeCode = sanitize(currentCode, 10000);
     String prompt = """
         You are a coding tutor helping a student solve a DSA problem.
 
@@ -80,13 +100,19 @@ public class GrokCodingService {
           "hint": "The hint text here",
           "encouragement": "A short motivating message"
         }
-        """.formatted(problemJson, currentCode.isEmpty() ? "Not started yet" : currentCode,
+        """.formatted(safeProblem, safeCode.isEmpty() ? "Not started yet" : safeCode,
         hintsUsed, hintsUsed + 1, hintsUsed + 1);
 
     return groqClient.call(prompt, 500);
   }
 
+  /**
+   * FIX C1: Sanitize submittedCode and language before injecting into prompt.
+   */
   public String reviewCode(String problemJson, String submittedCode, String language) {
+    String safeProblem = sanitize(problemJson, 4000);
+    String safeCode = sanitize(submittedCode, 15000);
+    String safeLang = sanitize(language);
     String prompt = """
         You are an expert code reviewer and DSA tutor for Indian college students.
 
@@ -112,7 +138,7 @@ public class GrokCodingService {
           "suggestedTimeComplexity": "O(n log n) - optimal complexity",
           "suggestedSpaceComplexity": "O(1) - optimal complexity"
         }
-        """.formatted(problemJson, language, submittedCode);
+        """.formatted(safeProblem, safeLang, safeCode);
 
     return groqClient.call(prompt, 2000);
   }

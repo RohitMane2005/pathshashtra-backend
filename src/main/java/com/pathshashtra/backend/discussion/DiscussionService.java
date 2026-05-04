@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.discussion;
 
+import com.pathshashtra.backend.common.HtmlSanitizer;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.data.domain.Page;
@@ -18,15 +19,18 @@ public class DiscussionService {
     private final DiscussionReplyRepository replyRepo;
     private final DiscussionVoteRepository voteRepo;
     private final UserRepository userRepo;
+    private final HtmlSanitizer htmlSanitizer;
 
     public DiscussionService(DiscussionPostRepository postRepo,
                              DiscussionReplyRepository replyRepo,
                              DiscussionVoteRepository voteRepo,
-                             UserRepository userRepo) {
+                             UserRepository userRepo,
+                             HtmlSanitizer htmlSanitizer) {
         this.postRepo = postRepo;
         this.replyRepo = replyRepo;
         this.voteRepo = voteRepo;
         this.userRepo = userRepo;
+        this.htmlSanitizer = htmlSanitizer;
     }
 
     public Page<DiscussionPost> listPosts(String tag, String search, String sort, int page) {
@@ -60,8 +64,8 @@ public class DiscussionService {
         DiscussionPost post = new DiscussionPost();
         post.setUserId(user.getId());
         post.setAuthorName(user.getName());
-        post.setTitle(title.trim());
-        post.setContent(content.trim());
+        post.setTitle(htmlSanitizer.sanitize(title.trim(), 200));
+        post.setContent(htmlSanitizer.sanitize(content.trim(), 10000));
         post.setTags(tags != null ? tags.trim().toLowerCase() : "");
         post.setCreatedAt(LocalDateTime.now());
         post.setUpdatedAt(LocalDateTime.now());
@@ -79,7 +83,7 @@ public class DiscussionService {
         reply.setPostId(postId);
         reply.setUserId(user.getId());
         reply.setAuthorName(user.getName());
-        reply.setContent(content.trim());
+        reply.setContent(htmlSanitizer.sanitize(content.trim(), 10000));
         reply.setCreatedAt(LocalDateTime.now());
         DiscussionReply saved = replyRepo.save(reply);
 

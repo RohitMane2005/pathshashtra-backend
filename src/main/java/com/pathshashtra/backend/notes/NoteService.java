@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.notes;
 
+import com.pathshashtra.backend.common.HtmlSanitizer;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.stereotype.Service;
@@ -13,10 +14,12 @@ public class NoteService {
 
     private final NoteRepository noteRepo;
     private final UserRepository userRepo;
+    private final HtmlSanitizer htmlSanitizer;
 
-    public NoteService(NoteRepository noteRepo, UserRepository userRepo) {
+    public NoteService(NoteRepository noteRepo, UserRepository userRepo, HtmlSanitizer htmlSanitizer) {
         this.noteRepo = noteRepo;
         this.userRepo = userRepo;
+        this.htmlSanitizer = htmlSanitizer;
     }
 
     public List<Note> getNotes(String email, String category, String search) {
@@ -31,18 +34,28 @@ public class NoteService {
         return noteRepo.findByUserIdOrderByIsPinnedDescUpdatedAtDesc(user.getId());
     }
 
+    /**
+     * FIX C3: Accept NoteRequest DTO instead of Note entity.
+     * Prevents mass assignment of userId, id, isPinned etc.
+     */
     @Transactional
-    public Note createNote(String email, Note note) {
+    public Note createNote(String email, NoteRequest request) {
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        Note note = new Note();
         note.setUserId(user.getId());
+        note.setTitle(htmlSanitizer.sanitize(request.getTitle(), 200));
+        note.setContent(htmlSanitizer.sanitize(request.getContent(), 50000));
+        note.setCategory(request.getCategory() != null ? request.getCategory() : "GENERAL");
+        note.setTags(htmlSanitizer.sanitize(request.getTags(), 500));
         note.setCreatedAt(LocalDateTime.now());
         note.setUpdatedAt(LocalDateTime.now());
         return noteRepo.save(note);
     }
 
+    /** FIX C3: Accept NoteRequest DTO instead of Note entity. */
     @Transactional
-    public Note updateNote(String email, Long noteId, Note updates) {
+    public Note updateNote(String email, Long noteId, NoteRequest request) {
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         Note note = noteRepo.findById(noteId)
@@ -50,10 +63,10 @@ public class NoteService {
         if (!note.getUserId().equals(user.getId())) {
             throw new RuntimeException("Access denied");
         }
-        note.setTitle(updates.getTitle());
-        note.setContent(updates.getContent());
-        note.setCategory(updates.getCategory());
-        note.setTags(updates.getTags());
+        note.setTitle(htmlSanitizer.sanitize(request.getTitle(), 200));
+        note.setContent(htmlSanitizer.sanitize(request.getContent(), 50000));
+        note.setCategory(request.getCategory());
+        note.setTags(htmlSanitizer.sanitize(request.getTags(), 500));
         note.setUpdatedAt(LocalDateTime.now());
         return noteRepo.save(note);
     }

@@ -26,8 +26,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
+        // FIX M3: Removed /actuator skip — if actuator endpoints are accidentally
+        // enabled, they should still require JWT authentication.
         String path = request.getServletPath();
-        return path.startsWith("/api/auth") || path.equals("/api/health") || path.startsWith("/actuator")
+        return path.startsWith("/api/auth") || path.equals("/api/health")
                 || path.startsWith("/api/quiz/share")
                 || path.startsWith("/login/oauth2") || path.startsWith("/oauth2");
     }

@@ -35,6 +35,11 @@ public class UserController {
         return ResponseEntity.ok(userService.getLeaderboard());
     }
 
+    /**
+     * FIX H3: Require password verification for account deletion.
+     * A compromised JWT + trivially guessable {"confirm":"DELETE"} body
+     * should not be enough to permanently delete an account.
+     */
     @DeleteMapping("/me")
     public ResponseEntity<Map<String, String>> deleteAccount(
             @RequestBody Map<String, String> body,
@@ -42,9 +47,14 @@ public class UserController {
 
         if (!"DELETE".equals(body.get("confirm"))) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Send { \"confirm\": \"DELETE\" } to confirm account deletion."));
+                    .body(Map.of("error", "Send { \"confirm\": \"DELETE\", \"password\": \"...\" } to confirm account deletion."));
         }
-        userService.deleteAccount(auth.getName());
+        String password = body.get("password");
+        if (password == null || password.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Password is required to confirm account deletion."));
+        }
+        userService.deleteAccount(auth.getName(), password);
         return ResponseEntity.ok(Map.of("message", "Account deleted. We're sorry to see you go."));
     }
 }

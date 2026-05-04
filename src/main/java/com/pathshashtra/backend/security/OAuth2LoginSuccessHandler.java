@@ -71,14 +71,12 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
         if (userOptional.isPresent()) {
             user = userOptional.get();
-            // FIX BUG 6: Update authProvider when existing user logs in via OAuth.
-            // Prevents dual-auth (local + OAuth) and keeps the field accurate.
-            String oauthProvider = registrationId.toUpperCase();
-            if ("LOCAL".equals(user.getAuthProvider())) {
-                user.setAuthProvider(oauthProvider);
-                userRepository.save(user);
-                log.info("Updated authProvider to {} for existing user: {}", oauthProvider, email);
-            }
+            // FIX H1: Do NOT overwrite authProvider for existing LOCAL users.
+            // Previously this changed LOCAL → GOOGLE/GITHUB, permanently locking
+            // users out of password-based login with no consent or warning.
+            // Existing users can log in via OAuth without changing their auth method.
+            log.info("Existing user {} logged in via OAuth (provider: {}, authProvider stays: {})",
+                    email, registrationId, user.getAuthProvider());
         } else {
             // Register new user
             user = new User();

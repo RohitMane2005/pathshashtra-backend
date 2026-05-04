@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.ratelimit;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,6 +12,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 /**
  * FIX D1: Global per-user API rate limiter.
@@ -22,9 +24,11 @@ import java.nio.charset.StandardCharsets;
 public class GlobalRateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimiter rateLimiter;
+    private final ObjectMapper objectMapper;
 
-    public GlobalRateLimitFilter(RateLimiter rateLimiter) {
+    public GlobalRateLimitFilter(RateLimiter rateLimiter, ObjectMapper objectMapper) {
         this.rateLimiter = rateLimiter;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -46,7 +50,9 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
                 response.setStatus(429); // Too Many Requests
                 response.setContentType("application/json");
                 response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-                response.getWriter().write("{\"error\":\"Too many requests. Please slow down.\",\"status\":429}");
+                // FIX H5: Use ObjectMapper for safe, consistent JSON serialization
+                objectMapper.writeValue(response.getWriter(),
+                        Map.of("error", "Too many requests. Please slow down.", "status", 429));
                 return;
             }
         }
@@ -54,3 +60,4 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 }
+
