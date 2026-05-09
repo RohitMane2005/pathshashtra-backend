@@ -29,6 +29,19 @@ public class GrokCodingService {
     return s.length() > maxLen ? s.substring(0, maxLen) : s;
   }
 
+  /**
+   * Sanitize user-submitted code — preserves quotes, backslashes, angle brackets
+   * and backticks that are essential in programming languages.
+   * Only strips prompt-injection patterns and truncates to maxLen.
+   */
+  private String sanitizeCode(String input, int maxLen) {
+    if (input == null) return "";
+    String s = input
+        .replaceAll("(?i)(ignore|forget|disregard)\\s+(above|previous|all)", "[filtered]")
+        .strip();
+    return s.length() > maxLen ? s.substring(0, maxLen) : s;
+  }
+
   /** Convenience overload for short metadata fields. */
   private String sanitize(String input) {
     return sanitize(input, 200);
@@ -77,7 +90,7 @@ public class GrokCodingService {
    */
   public String generateHint(String problemJson, String currentCode, int hintsUsed) {
     String safeProblem = sanitize(problemJson, 4000);
-    String safeCode = sanitize(currentCode, 10000);
+    String safeCode = sanitizeCode(currentCode, 10000);
     String prompt = """
         You are a coding tutor helping a student solve a DSA problem.
 
@@ -111,7 +124,7 @@ public class GrokCodingService {
    */
   public String reviewCode(String problemJson, String submittedCode, String language) {
     String safeProblem = sanitize(problemJson, 4000);
-    String safeCode = sanitize(submittedCode, 15000);
+    String safeCode = sanitizeCode(submittedCode, 15000);
     String safeLang = sanitize(language);
     String prompt = """
         You are an expert code reviewer and DSA tutor for Indian college students.

@@ -208,7 +208,7 @@ public class CodingService {
         return response;
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public Map<String, Object> getDsaRoadmap(String email, String targetGoal) {
         User user = getUser(email);
         final String[] level = {"Beginner"};
@@ -260,8 +260,8 @@ public class CodingService {
             List<String> improvements = new ArrayList<>();
             List<String> bugs = new ArrayList<>();
             for (JsonNode s : root.path("strengths")) strengths.add(s.asText());
-            for (JsonNode i : root.path("improvements")) improvements.add(i.asText());
-            for (JsonNode b : root.path("bugs")) bugs.add(b.asText());
+            for (JsonNode imp : root.path("improvements")) improvements.add(imp.asText());
+            for (JsonNode bug : root.path("bugs")) bugs.add(bug.asText());
 
             return CodeFeedback.builder()
                     .isCorrect(root.path("isCorrect").asBoolean())

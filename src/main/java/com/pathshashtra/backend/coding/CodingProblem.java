@@ -45,8 +45,13 @@ public class CodingProblem {
     private ProblemStatus status = ProblemStatus.GENERATED;
 
     private int hintsUsed = 0;
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
     private LocalDateTime solvedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
 
     public enum ProblemStatus {
         GENERATED, ATTEMPTED, SOLVED, REVIEWED

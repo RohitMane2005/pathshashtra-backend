@@ -40,10 +40,40 @@ public class JsonCleaner {
         int objStart = s.indexOf('{');
         int arrStart = s.indexOf('[');
         int start = -1;
-        if (objStart >= 0 && arrStart >= 0) start = Math.min(objStart, arrStart);
-        else if (objStart >= 0) start = objStart;
-        else if (arrStart >= 0) start = arrStart;
+        char openChar;
+        char closeChar;
+        if (objStart >= 0 && arrStart >= 0) {
+            start = Math.min(objStart, arrStart);
+        } else if (objStart >= 0) {
+            start = objStart;
+        } else if (arrStart >= 0) {
+            start = arrStart;
+        }
+        if (start < 0) return s; // no JSON structure found
         if (start > 0) s = s.substring(start);
+
+        // Find the matching closing delimiter to strip trailing text
+        openChar = s.charAt(0);
+        closeChar = (openChar == '{') ? '}' : ']';
+        int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+        int end = -1;
+        for (int idx = 0; idx < s.length(); idx++) {
+            char c = s.charAt(idx);
+            if (escaped) { escaped = false; continue; }
+            if (c == '\\' && inString) { escaped = true; continue; }
+            if (c == '"') { inString = !inString; continue; }
+            if (inString) continue;
+            if (c == openChar) depth++;
+            else if (c == closeChar) {
+                depth--;
+                if (depth == 0) { end = idx; break; }
+            }
+        }
+        if (end > 0 && end < s.length() - 1) {
+            s = s.substring(0, end + 1);
+        }
         return s;
     }
 }
