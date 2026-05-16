@@ -61,6 +61,10 @@ public class BookmarkController {
     @GetMapping("/check")
     public ResponseEntity<Map<String, Boolean>> check(
             @RequestParam String type, @RequestParam Long refId, Authentication auth) {
+        // SEC-08 fix: validate type against allowlist (same as toggle endpoint)
+        if (type == null || !ALLOWED_TYPES.contains(type)) {
+            return ResponseEntity.badRequest().build();
+        }
         boolean saved = savedItemRepository.existsByUserIdAndTypeAndRefId(getUser(auth).getId(), type, refId);
         return ResponseEntity.ok(Map.of("saved", saved));
     }

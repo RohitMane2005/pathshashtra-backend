@@ -87,8 +87,8 @@ public class DiscussionService {
         reply.setCreatedAt(LocalDateTime.now());
         DiscussionReply saved = replyRepo.save(reply);
 
-        post.setReplyCount(post.getReplyCount() + 1);
-        postRepo.save(post);
+        // BE-06 fix: atomic increment — no race condition with concurrent replies
+        postRepo.incrementReplyCount(postId);
         return saved;
     }
 

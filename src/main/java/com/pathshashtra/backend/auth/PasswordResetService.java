@@ -12,9 +12,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.Optional;
 
 @Service
@@ -60,27 +62,31 @@ public class PasswordResetService {
         // Invalidate any existing token for this user
         resetRepository.deleteByUserId(user.getId());
 
-        // Generate a 32-byte URL-safe token
+        // Generate a 32-byte URL-safe token (sent to user in email)
         byte[] bytes = new byte[32];
         SECURE_RANDOM.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+
+        // SEC-07 fix: store only the SHA-256 hash in the DB — raw token never persisted
+        // If the DB is breached, attackers cannot use stored hashes to reset accounts.
+        String tokenHash = sha256(rawToken);
 
         PasswordResetToken resetToken = new PasswordResetToken();
-        resetToken.setToken(token);
+        resetToken.setToken(tokenHash);  // store hash
         resetToken.setUser(user);
         resetToken.setExpiresAt(LocalDateTime.now().plusMinutes(30));
         resetToken.setUsed(false);
         resetRepository.save(resetToken);
 
-        sendResetEmail(user.getEmail(), token);
+        sendResetEmail(user.getEmail(), rawToken);  // send raw token in email
         log.info("Password reset token created for user {}", user.getId());
     }
 
     /**
      * Validates a reset token without consuming it (for the UI to check before showing the form).
      */
-    public boolean isTokenValid(String token) {
-        return resetRepository.findByToken(token)
+    public boolean isTokenValid(String rawToken) {
+        return resetRepository.findByToken(sha256(rawToken))
                 .map(t -> !t.isUsed() && !t.isExpired())
                 .orElse(false);
     }
@@ -89,8 +95,9 @@ public class PasswordResetService {
      * Resets the password using the token. Consumes (marks used) the token atomically.
      */
     @Transactional
-    public void resetPassword(String token, String newPassword) {
-        PasswordResetToken resetToken = resetRepository.findByToken(token)
+    public void resetPassword(String rawToken, String newPassword) {
+        // SEC-07: look up by hash, not raw token
+        PasswordResetToken resetToken = resetRepository.findByToken(sha256(rawToken))
                 .orElseThrow(() -> new RuntimeException("Invalid or expired reset link"));
 
         if (resetToken.isUsed()) throw new RuntimeException("Reset link already used");
@@ -104,6 +111,17 @@ public class PasswordResetService {
         resetRepository.save(resetToken);
 
         log.info("[AUDIT] Password successfully reset for userId={}", user.getId());
+    }
+
+    /** SHA-256 hex digest of input. Used for secure token storage. */
+    private String sha256(String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new RuntimeException("SHA-256 not available", e);
+        }
     }
 
     private void sendResetEmail(String toEmail, String token) {

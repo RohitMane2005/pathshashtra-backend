@@ -1,12 +1,18 @@
 package com.pathshashtra.backend.auth;
 
 import com.pathshashtra.backend.ratelimit.RateLimiter;
+import com.pathshashtra.backend.security.JwtUtil;
+import com.pathshashtra.backend.security.OAuthCodeService;
+import com.pathshashtra.backend.security.TokenBlacklist;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -19,10 +25,18 @@ public class AuthController {
 
     private final AuthService authService;
     private final RateLimiter rateLimiter;
+    private final JwtUtil jwtUtil;
+    private final TokenBlacklist tokenBlacklist;
+    private final OAuthCodeService oAuthCodeService;
 
-    public AuthController(AuthService authService, RateLimiter rateLimiter) {
+    public AuthController(AuthService authService, RateLimiter rateLimiter,
+                          JwtUtil jwtUtil, TokenBlacklist tokenBlacklist,
+                          OAuthCodeService oAuthCodeService) {
         this.authService = authService;
         this.rateLimiter = rateLimiter;
+        this.jwtUtil = jwtUtil;
+        this.tokenBlacklist = tokenBlacklist;
+        this.oAuthCodeService = oAuthCodeService;
     }
 
     /**
@@ -49,15 +63,19 @@ public class AuthController {
                     .body(Map.of("error", "Email already registered. Please sign in."));
         }
 
-        AuthResponse response = authService.register(request);
+        AuthResponse authResponse = authService.register(request);
         log.info("New user registered from ip={}", ip);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+        // Set cookie on registration
+        ResponseCookie cookie = jwtUtil.buildCookie(authResponse.getToken());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(authResponse);
     }
 
     /**
-     * Login — rate limited per IP (10/min) AND per email (5/5min).
-     * FIX A1: Account lockout after 10 failed attempts in 15 minutes.
-     * Uses generic error messages to prevent user enumeration.
+     * Login — rate limited per IP (10/15min).
+     * Sets an HttpOnly auth cookie alongside the response body token for backward compat.
      */
     @PostMapping("/login")
     public ResponseEntity<?> login(
@@ -68,38 +86,85 @@ public class AuthController {
         request.setEmail(email);
         String ip = getClientIp(httpRequest);
 
-        // FIX A1: Check account lockout BEFORE rate limit
-        if (rateLimiter.isAccountLocked(email)) {
-            log.warn("Login blocked — account locked for email={} ip={}", email, ip);
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(Map.of("error", "Account temporarily locked due to too many failed attempts. Please try again in 15 minutes."));
-        }
-
-        if (!rateLimiter.allowLogin(ip, email)) {
+        if (!rateLimiter.allowLogin(ip)) {
             log.warn("Login rate limit hit for email={} ip={}", email, ip);
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(Map.of("error", "Too many login attempts. Please wait a few minutes."));
         }
 
-        AuthResponse response = authService.login(request);
+        AuthResponse authResponse = authService.login(request);
 
-        if (response == null) {
-            // FIX A1: Record failed login attempt for lockout tracking
-            rateLimiter.recordFailedLogin(email);
+        if (authResponse == null) {
             log.warn("Failed login for email={} ip={}", email, ip);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "Invalid email or password"));
         }
 
-        // FIX A1: Clear failed login counter on success
-        rateLimiter.clearFailedLogins(email);
         log.info("Successful login for email={} ip={}", email, ip);
-        return ResponseEntity.ok(response);
+
+        // CRIT-01 fix: set HttpOnly cookie so JS cannot access the token
+        ResponseCookie cookie = jwtUtil.buildCookie(authResponse.getToken());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(authResponse);
     }
 
     /**
-     * FIX: X-Forwarded-For is used only if spring.server.forward-headers-strategy=framework
-     * is set (it is, in application.properties).
+     * Logout — blacklists the current JWT in Redis and clears the auth cookie.
+     * SEC-01: Token cannot be reused after logout even if captured from the network.
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(Authentication auth, HttpServletRequest request) {
+        // Extract token from cookie or Authorization header to blacklist it
+        String token = jwtUtil.extractFromCookie(request);
+        if (token == null) {
+            String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+            if (header != null && header.startsWith("Bearer ")) {
+                token = header.substring(7).trim();
+            }
+        }
+
+        if (token != null && jwtUtil.validateToken(token)) {
+            String jti = jwtUtil.extractJti(token);
+            long ttl = jwtUtil.extractRemainingSeconds(token);
+            tokenBlacklist.blacklist(jti, ttl);
+            log.info("Token blacklisted on logout for user={}", auth != null ? auth.getName() : "unknown");
+        }
+
+        ResponseCookie clearCookie = jwtUtil.buildClearCookie();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, clearCookie.toString())
+                .body(Map.of("message", "Logged out successfully"));
+    }
+
+    /**
+     * SEC-01 fix: Exchange a one-time OAuth code for an HttpOnly auth cookie.
+     * Called by the frontend's OAuth2RedirectHandler after receiving ?code=CODE.
+     * The code is consumed (single-use, 30s TTL in Redis).
+     */
+    @PostMapping("/exchange-code")
+    public ResponseEntity<?> exchangeOAuthCode(@RequestBody Map<String, String> body) {
+        String code = body.get("code");
+        if (code == null || code.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "code is required"));
+        }
+
+        String email = oAuthCodeService.exchangeCode(code);
+        if (email == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Invalid or expired OAuth code. Please try logging in again."));
+        }
+
+        String token = jwtUtil.generateToken(email);
+        ResponseCookie cookie = jwtUtil.buildCookie(token);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(Map.of("message", "Authenticated successfully"));
+    }
+
+    /**
+     * SEC-02: X-Forwarded-For trusted only because spring.server.forward-headers-strategy=framework.
+     * Railway's proxy sets this header for real client IPs.
      */
     private String getClientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");

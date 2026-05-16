@@ -13,7 +13,7 @@ public class ClaudeApiService {
         this.groqClient = groqClient;
     }
 
-    @Cacheable(value = "quiz-questions", key = "#userProfile.hashCode()")
+    @Cacheable(value = "quiz-questions", key = "#userProfile")
     public String generateQuizQuestions(String userProfile) {
         String prompt = """
             You are a career guidance expert for Indian college students.

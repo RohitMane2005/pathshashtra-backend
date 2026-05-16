@@ -1,62 +1,74 @@
 package com.pathshashtra.backend.auth;
 
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
+/**
+ * CRIT-04 FIX: OTP state migrated from JVM ConcurrentHashMap to Redis.
+ *
+ * Old problem: JVM hashmap is reset on every app restart/deployment.
+ *             A user requesting an OTP before deployment would have it
+ *             silently invalidated. Multi-instance deployments had completely
+ *             separate OTP stores — OTP generated on instance A would fail on instance B.
+ *
+ * New behaviour:
+ *  - OTPs stored in Redis with 10-minute TTL (auto-expiry, no cleanup needed)
+ *  - OTPs are single-use: consumed (deleted) on successful verification
+ *  - Consistent across all app instances
+ *  - Survives app restarts (Redis persists)
+ *
+ * Key pattern: otp:{email}   Value: OTP code   TTL: 10 minutes
+ */
 @Service
 public class OtpService {
 
-    // Use SecureRandom for security (not Random)
+    private static final long OTP_TTL_MINUTES = 10L;
+    private static final String PREFIX = "otp:";
     private final SecureRandom secureRandom = new SecureRandom();
-    private final Map<String, OtpEntry> otpStore = new ConcurrentHashMap<>();
+    private final StringRedisTemplate redisTemplate;
 
+    public OtpService(StringRedisTemplate redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
+
+    /**
+     * Generate and store a cryptographically secure 6-digit OTP for the email.
+     * Any previously generated OTP for this email is overwritten.
+     *
+     * @return the 6-digit OTP to send to the user
+     */
     public String generateOtp(String email) {
-        cleanExpired(); // FIX: evict stale entries so the map does not grow unboundedly
-        // Generate cryptographically secure 6-digit OTP
-        String otp = String.format("%06d", secureRandom.nextInt(1000000));
-        otpStore.put(email.toLowerCase().trim(),
-                new OtpEntry(otp, LocalDateTime.now().plusMinutes(10)));
+        String otp = String.format("%06d", secureRandom.nextInt(1_000_000));
+        String key = PREFIX + email.toLowerCase().trim();
+        redisTemplate.opsForValue().set(key, otp, OTP_TTL_MINUTES, TimeUnit.MINUTES);
         return otp;
     }
 
+    /**
+     * Verify the OTP for an email.
+     * Single-use: the OTP is deleted on successful verification.
+     *
+     * @return true if the OTP matches and has not expired; false otherwise
+     */
     public boolean verifyOtp(String email, String otp) {
         if (email == null || otp == null) return false;
-
-        OtpEntry entry = otpStore.get(email.toLowerCase().trim());
-        if (entry == null) return false;
-
-        if (LocalDateTime.now().isAfter(entry.expiry())) {
-            otpStore.remove(email.toLowerCase().trim());
-            return false;
-        }
-
-        if (!entry.otp().equals(otp.trim())) return false;
-
-        // OTP used — remove immediately to prevent reuse
-        otpStore.remove(email.toLowerCase().trim());
+        String key = PREFIX + email.toLowerCase().trim();
+        String stored = redisTemplate.opsForValue().get(key);
+        if (stored == null) return false;
+        if (!stored.equals(otp.trim())) return false;
+        // Single-use: delete on success
+        redisTemplate.delete(key);
         return true;
     }
 
+    /**
+     * Returns true if there is an active (non-expired) OTP for this email.
+     */
     public boolean hasOtp(String email) {
         if (email == null) return false;
-        OtpEntry entry = otpStore.get(email.toLowerCase().trim());
-        if (entry == null) return false;
-        if (LocalDateTime.now().isAfter(entry.expiry())) {
-            otpStore.remove(email.toLowerCase().trim());
-            return false;
-        }
-        return true;
+        return Boolean.TRUE.equals(redisTemplate.hasKey(PREFIX + email.toLowerCase().trim()));
     }
-
-    // Clean up expired OTPs periodically (called on each generate)
-    private void cleanExpired() {
-        otpStore.entrySet().removeIf(e ->
-                LocalDateTime.now().isAfter(e.getValue().expiry()));
-    }
-
-    record OtpEntry(String otp, LocalDateTime expiry) {}
 }

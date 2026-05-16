@@ -25,7 +25,7 @@ public class CareerAIService {
         .replace("{", "").replace("}", "").strip();
   }
 
-  @Cacheable(value = "career-questions", key = "#userProfile.hashCode()")
+  @Cacheable(value = "career-questions", key = "#userProfile")
   public String generateAssessmentQuestions(String userProfile) {
     String prompt = """
         You are an expert psychometric career counselor for Indian college students.

@@ -1,6 +1,15 @@
 target/
 *.class
 .env
+.env.production
+.env.local
 *.log
 .idea/
 *.iml
+# DEVOPS-03 fix: remove compiler log files that expose internal structure
+compile_errors.txt
+compile_log.txt
+errors.txt
+short_errors.txt
+mvn_*.txt
+*.txt.log

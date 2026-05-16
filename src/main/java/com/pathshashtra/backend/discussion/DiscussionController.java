@@ -2,25 +2,28 @@ package com.pathshashtra.backend.discussion;
 
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import com.pathshashtra.backend.ratelimit.RateLimiter;
 
 import java.util.Map;
 
 /**
  * FIX BUG 7: Replaced raw Map request bodies with validated DTOs.
- * All user-submitted content now has @NotBlank and @Size constraints,
- * preventing NPE and enforcing input limits.
+ * SEC-04 FIX: Added per-endpoint rate limits for posts (5/hr) and replies (30/hr).
  */
 @RestController
 @RequestMapping("/api/discussions")
 public class DiscussionController {
 
     private final DiscussionService service;
+    private final RateLimiter rateLimiter;
 
-    public DiscussionController(DiscussionService service) {
+    public DiscussionController(DiscussionService service, RateLimiter rateLimiter) {
         this.service = service;
+        this.rateLimiter = rateLimiter;
     }
 
     @GetMapping
@@ -33,8 +36,12 @@ public class DiscussionController {
     }
 
     @PostMapping
-    public ResponseEntity<DiscussionPost> create(
+    public ResponseEntity<?> create(
             @Valid @RequestBody CreatePostRequest request, Authentication auth) {
+        if (!rateLimiter.allowDiscussionPost(auth.getName())) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "You can post at most 5 discussions per hour."));
+        }
         return ResponseEntity.ok(service.createPost(
                 auth.getName(), request.getTitle(), request.getContent(), request.getTags()));
     }
@@ -45,8 +52,12 @@ public class DiscussionController {
     }
 
     @PostMapping("/{id}/reply")
-    public ResponseEntity<DiscussionReply> addReply(
+    public ResponseEntity<?> addReply(
             @PathVariable Long id, @Valid @RequestBody AddReplyRequest request, Authentication auth) {
+        if (!rateLimiter.allowDiscussionReply(auth.getName())) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "You can post at most 30 replies per hour."));
+        }
         return ResponseEntity.ok(service.addReply(auth.getName(), id, request.getContent()));
     }
 

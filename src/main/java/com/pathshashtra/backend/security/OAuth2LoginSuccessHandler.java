@@ -30,14 +30,17 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final OAuthCodeService oAuthCodeService;
 
     @Value("${frontend.url}")
     private String frontendUrl;
 
-    public OAuth2LoginSuccessHandler(JwtUtil jwtUtil, UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public OAuth2LoginSuccessHandler(JwtUtil jwtUtil, UserRepository userRepository,
+                                     PasswordEncoder passwordEncoder, OAuthCodeService oAuthCodeService) {
         this.jwtUtil = jwtUtil;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.oAuthCodeService = oAuthCodeService;
     }
 
     @Override
@@ -91,16 +94,20 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
         String token = jwtUtil.generateToken(user.getEmail());
 
-        // ── FIX 3: Invalidate the HTTP session after OAuth completes ─────
-        // The session was only needed for the OAuth authorization request flow.
-        // After JWT is issued, the session is unnecessary server-side state.
-        request.getSession(false);
+        // ── Invalidate HTTP session after OAuth completes ─────────────────
+        // Session was only needed for OAuth state storage. JWT is now the auth mechanism.
         if (request.getSession(false) != null) {
             request.getSession(false).invalidate();
         }
 
-        // Redirect to frontend with token
-        String redirectUrl = frontendUrl + "/oauth2/redirect?token=" + token;
+        // ── SEC-01 FIX: Do NOT put JWT in the redirect URL ────────────────
+        // Previously: redirected to /oauth2/redirect?token=JWT
+        // Problem:    JWT appears in browser history, server logs, Referrer headers
+        // Fix:        Issue a one-time, 30-second code stored in Redis.
+        //             Frontend exchanges it via POST /api/auth/exchange-code.
+        //             The JWT is set as an HttpOnly cookie in that response.
+        String code = oAuthCodeService.generateCode(user.getEmail());
+        String redirectUrl = frontendUrl + "/oauth2/redirect?code=" + code;
         response.sendRedirect(redirectUrl);
     }
 

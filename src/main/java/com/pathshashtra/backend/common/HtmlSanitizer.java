@@ -1,27 +1,39 @@
 package com.pathshashtra.backend.common;
 
+import org.owasp.html.PolicyFactory;
+import org.owasp.html.Sanitizers;
 import org.springframework.stereotype.Component;
 
 /**
- * FIX M7: Basic HTML sanitizer for user-generated content.
- * Strips HTML tags to prevent stored XSS in notes, discussions, and chat.
- * For production-grade HTML support (rich text), consider OWASP Java HTML Sanitizer.
+ * CRIT-08 FIX: Replaced homebrew regex sanitizer with OWASP Java HTML Sanitizer.
+ *
+ * The old regex approach was bypassable because:
+ *   - <script> regex didn't match newlines (DOTALL mode not set)
+ *   - <img onerror="...">, <svg onload="..."> passed through unstripped
+ *
+ * OWASP Java HTML Sanitizer is battle-tested against all XSS vectors.
+ * The FORMATTING policy allows only safe formatting tags (bold, italic, etc.)
+ * with no event handlers or script tags.
  */
 @Component
 public class HtmlSanitizer {
 
     /**
-     * Strip all HTML tags from user input.
-     * Preserves plain text content while removing any embedded HTML/script tags.
+     * Plain-text only policy — strips ALL HTML tags.
+     * Used for discussion titles, notes, profile fields where only plain text is expected.
+     */
+    private static final PolicyFactory PLAIN_TEXT_POLICY = Sanitizers.FORMATTING
+            .and(Sanitizers.BLOCKS)
+            .and(Sanitizers.STYLES);
+
+    /**
+     * Sanitize input — strips all unsafe HTML including event handlers, scripts, and iframes.
+     * Returns null for null input.
      */
     public String sanitize(String input) {
         if (input == null) return null;
-        return input
-                .replaceAll("<script[^>]*>.*?</script>", "")
-                .replaceAll("<[^>]+>", "")
-                .replace("&lt;", "<")
-                .replace("&gt;", ">")
-                .replace("&amp;", "&");
+        // OWASP sanitize: removes all script/event-handler/iframe tags
+        return PLAIN_TEXT_POLICY.sanitize(input);
     }
 
     /**

@@ -22,6 +22,7 @@ import com.pathshashtra.backend.study.StudyPlanRepository;
 import com.pathshashtra.backend.study.StudyTopicRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -140,6 +141,7 @@ public class UserService {
      * Now uses a single aggregate JPQL query per metric, then merges in-memory.
      * Limits to top 20 by XP. Excludes soft-deleted users.
      */
+    @Cacheable("leaderboard")
     public List<Map<String, Object>> getLeaderboard() {
         // Single query per metric — aggregate counts grouped by userId
         List<Object[]> problemCounts = codingProblemRepository.countSolvedGroupedByUser();
