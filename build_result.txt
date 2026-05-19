@@ -1,0 +1,80 @@
+﻿[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------------< com.pathshashtra:backend >----------------------
+[INFO] Building pathshashtra-backend 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ backend ---
+[INFO] Deleting C:\Users\hp\Desktop\PathshashtraBackend\backend\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ backend ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ backend ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 140 source files with javac [debug release 17] to target\classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/auth/PasswordResetController.java:[45,25] cannot find symbol
+  symbol:   method isAllowed(java.lang.String,int,int)
+  location: variable rateLimiter of type com.pathshashtra.backend.ratelimit.RateLimiter
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/career/CareerController.java:[28,25] cannot find symbol
+  symbol:   method isAllowed(java.lang.String,int,long)
+  location: variable rateLimiter of type com.pathshashtra.backend.ratelimit.RateLimiter
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/career/CareerController.java:[40,25] cannot find symbol
+  symbol:   method isAllowed(java.lang.String,int,long)
+  location: variable rateLimiter of type com.pathshashtra.backend.ratelimit.RateLimiter
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/user/QuotaController.java:[40,46] incompatible types: possible lossy conversion from long to int
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/coding/CodingController.java:[42,25] cannot find symbol
+  symbol:   method allowCodingHint(java.lang.String)
+  location: variable rateLimiter of type com.pathshashtra.backend.ratelimit.RateLimiter
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/coding/CodingController.java:[54,25] cannot find symbol
+  symbol:   method allowCodingSubmit(java.lang.String)
+  location: variable rateLimiter of type com.pathshashtra.backend.ratelimit.RateLimiter
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/config/SecurityConfig.java:[75,17] cannot find symbol
+  symbol:   method contentSecurityPolicy((csp)->csp[...]e\'"))
+  location: class org.springframework.security.config.annotation.web.configurers.HeadersConfigurer<org.springframework.security.config.annotation.web.builders.HttpSecurity>.PermissionsPolicyConfig
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/chat/ChatController.java:[63,25] cannot find symbol
+  symbol:   method allowRequest(java.lang.String,java.lang.String,int)
+  location: variable rateLimiter of type com.pathshashtra.backend.ratelimit.RateLimiter
+[INFO] 8 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  11.248 s
+[INFO] Finished at: 2026-05-19T20:39:49+05:30
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:compile (default-compile) on project backend: Compilation failure: Compilation failure: 
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/auth/PasswordResetController.java:[45,25] cannot find symbol
+[ERROR]   symbol:   method isAllowed(java.lang.String,int,int)
+[ERROR]   location: variable rateLimiter of type com.pathshashtra.backend.ratelimit.RateLimiter
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/career/CareerController.java:[28,25] cannot find symbol
+[ERROR]   symbol:   method isAllowed(java.lang.String,int,long)
+[ERROR]   location: variable rateLimiter of type com.pathshashtra.backend.ratelimit.RateLimiter
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/career/CareerController.java:[40,25] cannot find symbol
+[ERROR]   symbol:   method isAllowed(java.lang.String,int,long)
+[ERROR]   location: variable rateLimiter of type com.pathshashtra.backend.ratelimit.RateLimiter
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/user/QuotaController.java:[40,46] incompatible types: possible lossy conversion from long to int
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/coding/CodingController.java:[42,25] cannot find symbol
+[ERROR]   symbol:   method allowCodingHint(java.lang.String)
+[ERROR]   location: variable rateLimiter of type com.pathshashtra.backend.ratelimit.RateLimiter
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/coding/CodingController.java:[54,25] cannot find symbol
+[ERROR]   symbol:   method allowCodingSubmit(java.lang.String)
+[ERROR]   location: variable rateLimiter of type com.pathshashtra.backend.ratelimit.RateLimiter
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/config/SecurityConfig.java:[75,17] cannot find symbol
+[ERROR]   symbol:   method contentSecurityPolicy((csp)->csp[...]e\'"))
+[ERROR]   location: class org.springframework.security.config.annotation.web.configurers.HeadersConfigurer<org.springframework.security.config.annotation.web.builders.HttpSecurity>.PermissionsPolicyConfig
+[ERROR] /C:/Users/hp/Desktop/PathshashtraBackend/backend/src/main/java/com/pathshashtra/backend/chat/ChatController.java:[63,25] cannot find symbol
+[ERROR]   symbol:   method allowRequest(java.lang.String,java.lang.String,int)
+[ERROR]   location: variable rateLimiter of type com.pathshashtra.backend.ratelimit.RateLimiter
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

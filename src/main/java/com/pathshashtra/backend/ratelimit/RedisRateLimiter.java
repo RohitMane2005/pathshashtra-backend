@@ -1,4 +1,4 @@
-package com.pathshashtra.backend.security;
+package com.pathshashtra.backend.ratelimit;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;

@@ -18,6 +18,14 @@ public class RateLimiter {
         this.redis = redis;
     }
 
+    /**
+     * Generic pass-through for controllers that specify their own key/limit/window.
+     * Prefer the named methods for consistency, but this is available for ad-hoc limits.
+     */
+    public boolean isAllowed(String key, int limit, long windowSeconds) {
+        return redis.isAllowed(key, limit, windowSeconds);
+    }
+
     // ── Auth endpoints ────────────────────────────────────────────────────────
 
     /** 10 login attempts per IP per 15 minutes */
@@ -57,6 +65,21 @@ public class RateLimiter {
         return redis.isAllowed("ai_career:" + email, 3, 86400);
     }
 
+    /** 30 coding hints per user per day */
+    public boolean allowCodingHint(String email) {
+        return redis.isAllowed("ai_coding_hint:" + email, 30, 86400);
+    }
+
+    /** 30 coding submissions per user per day */
+    public boolean allowCodingSubmit(String email) {
+        return redis.isAllowed("ai_coding_submit:" + email, 30, 86400);
+    }
+
+    /** 3 study plan generations per user per day */
+    public boolean allowStudyPlanGenerate(String email) {
+        return redis.isAllowed("ai_study:" + email, 3, 86400);
+    }
+
     /** 30 chat messages per user per hour */
     public boolean allowChatMessage(String email) {
         return redis.isAllowed("chat:" + email, 30, 3600);
@@ -76,9 +99,17 @@ public class RateLimiter {
 
     // ── Utility ───────────────────────────────────────────────────────────────
 
-    /** Utility */
-    public long remaining(String prefix, String identifier, int limit) {
-        return redis.remaining(prefix, identifier, limit);
+    /**
+     * Generic rate-limit check with custom prefix, identifier, and limit.
+     * Used by ChatController and similar ad-hoc rate-limiting.
+     */
+    public boolean allowRequest(String prefix, String identifier, int limit) {
+        return redis.isAllowed(prefix + identifier, limit, 86400);
+    }
+
+    /** Returns remaining quota as int for header/response use */
+    public int remaining(String prefix, String identifier, int limit) {
+        return (int) redis.remaining(prefix, identifier, limit);
     }
 
     /** 120 requests/min per authenticated user — global API scraping protection */

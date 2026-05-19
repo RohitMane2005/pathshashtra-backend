@@ -61,26 +61,27 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
 
             // Security headers — HSTS, X-Frame-Options, X-Content-Type, Referrer-Policy, Permissions-Policy, CSP
-            .headers(headers -> headers
-                .httpStrictTransportSecurity(hsts -> hsts
-                    .includeSubDomains(true)
-                    .maxAgeInSeconds(31536000))
-                .frameOptions(frame -> frame.deny())
-                .contentTypeOptions(cto -> {})
-                .referrerPolicy(rp -> rp.policy(
-                    ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                .permissionsPolicy(pp -> pp.policy(
-                    "camera=(), microphone=(), geolocation=(), payment=()"))
-                // FE-02 FIX: Content-Security-Policy
-                .contentSecurityPolicy(csp -> csp.policyDirectives(
+            .headers(headers -> {
+                headers
+                    .httpStrictTransportSecurity(hsts -> hsts
+                        .includeSubDomains(true)
+                        .maxAgeInSeconds(31536000))
+                    .frameOptions(frame -> frame.deny())
+                    .contentTypeOptions(cto -> {})
+                    .referrerPolicy(rp -> rp.policy(
+                        ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                    .permissionsPolicy(pp -> pp.policy(
+                        "camera=(), microphone=(), geolocation=(), payment=()"));
+                // FE-02 FIX: Content-Security-Policy (separate statement to avoid chaining issues)
+                headers.contentSecurityPolicy(csp -> csp.policyDirectives(
                     "default-src 'self'; " +
                     "script-src 'self'; " +
                     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
                     "font-src 'self' https://fonts.gstatic.com; " +
                     "connect-src 'self'; " +
                     "img-src 'self' data: https:; " +
-                    "frame-ancestors 'none'"))
-            )
+                    "frame-ancestors 'none'"));
+            })
 
             .exceptionHandling(ex -> ex.authenticationEntryPoint(
                     new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
