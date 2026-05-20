@@ -5,6 +5,7 @@ import com.pathshashtra.backend.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,6 +30,7 @@ public class PasswordResetService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
+    private final StringRedisTemplate redisTemplate;
 
     @Value("${spring.mail.username:}")
     private String mailUsername;
@@ -39,11 +41,13 @@ public class PasswordResetService {
     public PasswordResetService(PasswordResetRepository resetRepository,
                                 UserRepository userRepository,
                                 PasswordEncoder passwordEncoder,
-                                JavaMailSender mailSender) {
+                                JavaMailSender mailSender,
+                                StringRedisTemplate redisTemplate) {
         this.resetRepository = resetRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.mailSender = mailSender;
+        this.redisTemplate = redisTemplate;
     }
 
     /**
@@ -93,6 +97,10 @@ public class PasswordResetService {
 
     /**
      * Resets the password using the token. Consumes (marks used) the token atomically.
+     *
+     * HIGH-04 FIX: After password change, bumps a Redis password-version counter.
+     * JwtAuthenticationFilter checks this version against the token's issued-at time
+     * to reject tokens issued before the password change.
      */
     @Transactional
     public void resetPassword(String rawToken, String newPassword) {
@@ -110,7 +118,15 @@ public class PasswordResetService {
         resetToken.setUsed(true);
         resetRepository.save(resetToken);
 
-        log.info("[AUDIT] Password successfully reset for userId={}", user.getId());
+        // HIGH-04 FIX: Invalidate all existing sessions by recording password-change timestamp.
+        // Any JWT issued before this timestamp will be rejected by JwtAuthenticationFilter.
+        // Key uses email to match JwtAuthenticationFilter's lookup (JWT subject = email).
+        String pwdChangeKey = "pwd_changed:" + user.getEmail();
+        redisTemplate.opsForValue().set(pwdChangeKey,
+                String.valueOf(System.currentTimeMillis()),
+                86400, java.util.concurrent.TimeUnit.SECONDS); // 24h = max JWT lifetime
+
+        log.info("[AUDIT] Password successfully reset for userId={}, all prior tokens invalidated", user.getId());
     }
 
     /** SHA-256 hex digest of input. Used for secure token storage. */

@@ -36,7 +36,7 @@ public class AuthService {
         user.setRole("STUDENT");
         userRepository.save(user);
         log.info("Registered user: {}", request.getEmail());
-        return new AuthResponse(jwtUtil.generateToken(user.getEmail()));
+        return new AuthResponse(jwtUtil.generateToken(user.getEmail(), user.getRole()));
     }
 
     /**
@@ -68,6 +68,6 @@ public class AuthService {
             return null;
         }
 
-        return new AuthResponse(jwtUtil.generateToken(user.getEmail()));
+        return new AuthResponse(jwtUtil.generateToken(user.getEmail(), user.getRole()));
     }
 }

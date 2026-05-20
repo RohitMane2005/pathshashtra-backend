@@ -152,12 +152,25 @@ public class UserService {
         Map<Long, Long> topicMap = toMap(topicCounts);
         Map<Long, Long> quizMap = toMap(quizCounts);
 
-        // FIX BUG 12: Use findAllActive() instead of findAll() + in-memory filter.
-        // Filters soft-deleted users at the DB level.
-        List<User> users = userRepository.findAllActive();
+        /**
+         * HIGH-05 FIX: Instead of loading ALL active users into memory,
+         * only load users who have at least one activity (appear in any aggregate map).
+         * At 100K users, this reduces memory from 100K entities to ~500 active ones.
+         */
+        Set<Long> activeUserIds = new HashSet<>();
+        activeUserIds.addAll(problemMap.keySet());
+        activeUserIds.addAll(topicMap.keySet());
+        activeUserIds.addAll(quizMap.keySet());
+
+        if (activeUserIds.isEmpty()) return List.of();
+
+        // Only fetch the users who have XP — not ALL users
+        List<User> activeUsers = userRepository.findAllById(activeUserIds).stream()
+                .filter(u -> u.getDeletedAt() == null)
+                .toList();
 
         List<Map<String, Object>> board = new ArrayList<>();
-        for (User user : users) {
+        for (User user : activeUsers) {
             long problems = problemMap.getOrDefault(user.getId(), 0L);
             long topics = topicMap.getOrDefault(user.getId(), 0L);
             long quizzes = quizMap.getOrDefault(user.getId(), 0L);

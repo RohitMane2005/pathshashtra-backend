@@ -59,6 +59,8 @@ public class ContestService {
         return result;
     }
 
+    /** HIGH-06 FIX: Only admins can create contests. @EnableMethodSecurity in SecurityConfig enables this. */
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public Contest createContest(String email, Contest contest, List<ContestProblem> problems) {
         User user = userRepo.findByEmail(email)

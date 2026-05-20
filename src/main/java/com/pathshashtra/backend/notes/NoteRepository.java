@@ -14,4 +14,7 @@ public interface NoteRepository extends JpaRepository<Note, Long> {
     List<Note> search(Long userId, String q);
 
     void deleteByUserId(Long userId);
+
+    /** M-03 FIX: Efficient COUNT instead of loading all notes to count them. */
+    long countByUserId(Long userId);
 }

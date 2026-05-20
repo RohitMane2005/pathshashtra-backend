@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -25,7 +26,7 @@ import java.util.Map;
  *   2. Authorization: Bearer <token> header (backward compat)
  *
  * Additionally checks the TokenBlacklist to reject revoked tokens
- * (fixes CRIT-02 — stolen tokens are invalidated on logout/password-change).
+ * and validates against password-change timestamps (HIGH-04 FIX).
  */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -35,13 +36,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
     private final TokenBlacklist tokenBlacklist;
     private final ObjectMapper objectMapper;
+    private final StringRedisTemplate redisTemplate;
 
     public JwtAuthenticationFilter(JwtUtil jwtUtil,
                                    TokenBlacklist tokenBlacklist,
-                                   ObjectMapper objectMapper) {
+                                   ObjectMapper objectMapper,
+                                   StringRedisTemplate redisTemplate) {
         this.jwtUtil = jwtUtil;
         this.tokenBlacklist = tokenBlacklist;
         this.objectMapper = objectMapper;
+        this.redisTemplate = redisTemplate;
     }
 
     @Override
@@ -67,10 +71,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
 
                 String email = jwtUtil.extractEmail(token);
+
+                // HIGH-04 FIX: Reject tokens issued before a password change.
+                // PasswordResetService stores the change timestamp in Redis.
+                long tokenIssuedAt = jwtUtil.extractIssuedAt(token);
+                String pwdChangeKey = "pwd_changed:" + email;
+                String pwdChangeTs = redisTemplate.opsForValue().get(pwdChangeKey);
+                if (pwdChangeTs != null && tokenIssuedAt < Long.parseLong(pwdChangeTs)) {
+                    sendUnauthorized(response, "Password was changed. Please log in again.");
+                    return;
+                }
+
+                // HIGH-06 FIX: Extract role from JWT to enable @PreAuthorize RBAC.
+                String role = jwtUtil.extractRole(token);
+                List<SimpleGrantedAuthority> authorities = List.of(
+                        new SimpleGrantedAuthority("ROLE_" + (role != null ? role.toUpperCase() : "USER"))
+                );
+
                 UsernamePasswordAuthenticationToken auth =
-                        new UsernamePasswordAuthenticationToken(
-                                email, null,
-                                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+                        new UsernamePasswordAuthenticationToken(email, null, authorities);
                 SecurityContextHolder.getContext().setAuthentication(auth);
 
             } catch (Exception e) {
@@ -105,3 +124,4 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         objectMapper.writeValue(response.getWriter(), Map.of("error", message));
     }
 }
+

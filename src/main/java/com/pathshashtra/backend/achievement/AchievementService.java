@@ -94,7 +94,8 @@ public class AchievementService {
         try {
             long solvedProblems = codingRepo.countSolvedByUserId(userId);
             long quizzes = quizRepo.countByUserId(userId);
-            long notes = noteRepo.findByUserIdOrderByIsPinnedDescUpdatedAtDesc(userId).size();
+            // M-03 FIX: Use COUNT query instead of loading all notes into memory
+            long notes = noteRepo.countByUserId(userId);
             long following = followRepo.countByFollowerId(userId);
 
             checkBadge(userId, "FIRST_PROBLEM", solvedProblems >= 1);

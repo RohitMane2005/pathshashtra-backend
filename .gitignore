@@ -6,10 +6,14 @@ target/
 *.log
 .idea/
 *.iml
-# DEVOPS-03 fix: remove compiler log files that expose internal structure
+
+# L-01 FIX: Debug/build output files — never commit these
 compile_errors.txt
 compile_log.txt
+compile_output.txt
+current_errors.txt
 errors.txt
 short_errors.txt
+build_result*.txt
 mvn_*.txt
 *.txt.log

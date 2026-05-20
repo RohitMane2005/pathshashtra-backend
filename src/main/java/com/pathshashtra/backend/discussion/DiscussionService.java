@@ -117,17 +117,18 @@ public class DiscussionService {
         return Map.of("voted", voted);
     }
 
+    /**
+     * HIGH-03 FIX: Use atomic SQL updates instead of read-modify-write.
+     * OLD: findById → setUpvotes(current + delta) → save — race condition.
+     * NEW: UPDATE SET upvotes = GREATEST(0, upvotes ± 1) — atomic, no lost updates.
+     */
     private void updateVoteCount(String type, Long id, int delta) {
         if ("POST".equals(type)) {
-            postRepo.findById(id).ifPresent(p -> {
-                p.setUpvotes(Math.max(0, p.getUpvotes() + delta));
-                postRepo.save(p);
-            });
+            if (delta > 0) postRepo.incrementUpvotes(id);
+            else postRepo.decrementUpvotes(id);
         } else {
-            replyRepo.findById(id).ifPresent(r -> {
-                r.setUpvotes(Math.max(0, r.getUpvotes() + delta));
-                replyRepo.save(r);
-            });
+            if (delta > 0) replyRepo.incrementUpvotes(id);
+            else replyRepo.decrementUpvotes(id);
         }
     }
 }

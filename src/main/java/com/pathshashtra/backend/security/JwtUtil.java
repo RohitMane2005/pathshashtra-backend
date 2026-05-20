@@ -64,15 +64,26 @@ public class JwtUtil {
 
     // ── Token generation ──────────────────────────────────────────────────────
 
-    public String generateToken(String email) {
+    /**
+     * Generate a JWT with email as subject and role as a custom claim.
+     * HIGH-06 FIX: Role is now embedded in the token so JwtAuthenticationFilter
+     * can extract it without a DB lookup per request.
+     */
+    public String generateToken(String email, String role) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .id(UUID.randomUUID().toString())   // jti — enables blacklisting
                 .subject(email)
+                .claim("role", role != null ? role : "STUDENT")
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(expirationMs)))
                 .signWith(key)
                 .compact();
+    }
+
+    /** Backward-compatible overload — defaults to STUDENT role. */
+    public String generateToken(String email) {
+        return generateToken(email, "STUDENT");
     }
 
     // ── Token parsing ─────────────────────────────────────────────────────────
@@ -89,6 +100,18 @@ public class JwtUtil {
         Date exp = parseClaims(token).getExpiration();
         long remaining = (exp.getTime() - System.currentTimeMillis()) / 1000;
         return Math.max(0, remaining);
+    }
+
+    /** HIGH-04 FIX: Extract issued-at time in millis for password-change validation. */
+    public long extractIssuedAt(String token) {
+        Date iat = parseClaims(token).getIssuedAt();
+        return iat != null ? iat.getTime() : 0;
+    }
+
+    /** HIGH-06 FIX: Extract role claim for RBAC authority population. */
+    public String extractRole(String token) {
+        Object role = parseClaims(token).get("role");
+        return role != null ? role.toString() : null;
     }
 
     public boolean validateToken(String token) {

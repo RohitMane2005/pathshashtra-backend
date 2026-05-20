@@ -42,15 +42,15 @@ public class OAuthCodeService {
     /**
      * Exchange the one-time code for the user email.
      * Returns null if the code is invalid or expired.
-     * Deletes the code atomically after retrieval (single-use).
+     *
+     * CRIT-02 FIX: Uses atomic getAndDelete() (Redis GETDEL command) instead of
+     * separate GET + DELETE. The old approach had a TOCTOU race condition where
+     * two concurrent requests could both read the email before either deleted the key.
      */
     public String exchangeCode(String code) {
         if (code == null || code.isBlank()) return null;
         String key = PREFIX + code;
-        String email = redisTemplate.opsForValue().get(key);
-        if (email != null) {
-            redisTemplate.delete(key);
-        }
-        return email;
+        // Atomic: returns value and deletes key in one Redis command
+        return redisTemplate.opsForValue().getAndDelete(key);
     }
 }

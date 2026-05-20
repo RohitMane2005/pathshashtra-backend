@@ -62,22 +62,25 @@ public class SocialService {
         return Map.of("following", following);
     }
 
+    /**
+     * HIGH-02 FIX: Batch-fetch users instead of N+1.
+     * OLD: each Follow → findById + existsBy = 2 queries per follower.
+     * NEW: 1 query for all users + 1 query for follow status = 2 total.
+     */
     public List<Map<String, Object>> getFollowing(String email) {
         User me = userRepo.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        return followRepo.findByFollowerId(me.getId()).stream()
-                .map(f -> userToMap(f.getFollowingId(), me.getId()))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        List<Long> followingIds = followRepo.findByFollowerId(me.getId()).stream()
+                .map(Follow::getFollowingId).toList();
+        return batchUserMaps(followingIds, me.getId());
     }
 
     public List<Map<String, Object>> getFollowers(String email) {
         User me = userRepo.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        return followRepo.findByFollowingId(me.getId()).stream()
-                .map(f -> userToMap(f.getFollowerId(), me.getId()))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        List<Long> followerIds = followRepo.findByFollowingId(me.getId()).stream()
+                .map(Follow::getFollowerId).toList();
+        return batchUserMaps(followerIds, me.getId());
     }
 
     public Map<String, Object> getPublicProfile(String email, Long userId) {
@@ -150,15 +153,28 @@ public class SocialService {
         return Map.of("me", myStats, "them", theirStats);
     }
 
-    private Map<String, Object> userToMap(Long userId, Long myId) {
-        return userRepo.findById(userId)
+    /**
+     * HIGH-02 FIX: Batch-fetch all users by IDs in one query, then check follow
+     * status for all of them in one query. Replaces the old userToMap() which did
+     * 2 DB queries per user (N+1 pattern).
+     */
+    private List<Map<String, Object>> batchUserMaps(List<Long> userIds, Long myId) {
+        if (userIds.isEmpty()) return List.of();
+        List<User> users = userRepo.findAllById(userIds);
+        Set<Long> myFollowingIds = followRepo.findByFollowerId(myId).stream()
+                .map(Follow::getFollowingId)
+                .filter(userIds::contains)
+                .collect(Collectors.toSet());
+
+        return users.stream()
                 .filter(u -> u.getDeletedAt() == null)
                 .map(u -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("userId", u.getId());
                     m.put("name", u.getName());
-                    m.put("isFollowing", followRepo.existsByFollowerIdAndFollowingId(myId, u.getId()));
+                    m.put("isFollowing", myFollowingIds.contains(u.getId()));
                     return m;
-                }).orElse(null);
+                })
+                .collect(Collectors.toList());
     }
 }

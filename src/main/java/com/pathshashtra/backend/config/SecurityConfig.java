@@ -9,6 +9,7 @@ import com.pathshashtra.backend.security.TokenBlacklist;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -32,17 +33,20 @@ public class SecurityConfig {
     private final GlobalRateLimitFilter globalRateLimitFilter;
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
     private final OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
+    private final StringRedisTemplate redisTemplate;
 
     public SecurityConfig(JwtUtil jwtUtil, TokenBlacklist tokenBlacklist, ObjectMapper objectMapper,
                           GlobalRateLimitFilter globalRateLimitFilter,
                           OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler,
-                          OAuth2LoginFailureHandler oAuth2LoginFailureHandler) {
+                          OAuth2LoginFailureHandler oAuth2LoginFailureHandler,
+                          StringRedisTemplate redisTemplate) {
         this.jwtUtil = jwtUtil;
         this.tokenBlacklist = tokenBlacklist;
         this.objectMapper = objectMapper;
         this.globalRateLimitFilter = globalRateLimitFilter;
         this.oAuth2LoginSuccessHandler = oAuth2LoginSuccessHandler;
         this.oAuth2LoginFailureHandler = oAuth2LoginFailureHandler;
+        this.redisTemplate = redisTemplate;
     }
 
     @Bean
@@ -52,9 +56,16 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtil, tokenBlacklist, objectMapper);
+        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtil, tokenBlacklist, objectMapper, redisTemplate);
         http
             .cors(cors -> {})
+            /**
+             * CRIT-01 FIX: CSRF is disabled because auth cookies use SameSite=Lax.
+             * SameSite=Lax instructs browsers to NOT send cookies on cross-origin
+             * POST/PUT/DELETE requests, which is the exact protection CSRF tokens provide.
+             * This is the modern, recommended approach for API-first backends.
+             * See: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#samesite-cookie-attribute
+             */
             .csrf(csrf -> csrf.disable())
             .formLogin(form -> form.disable())
             .httpBasic(basic -> basic.disable())
