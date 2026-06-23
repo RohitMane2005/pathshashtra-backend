@@ -1,5 +1,7 @@
 package com.pathshashtra.backend.contest;
 
+import com.pathshashtra.backend.exception.BadRequestException;
+import com.pathshashtra.backend.exception.NotFoundException;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -51,7 +53,7 @@ public class ContestService {
 
     public Map<String, Object> getContest(Long id) {
         Contest contest = contestRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Contest not found"));
+                .orElseThrow(() -> new NotFoundException("Contest not found"));
         List<ContestProblem> problems = problemRepo.findByContestIdOrderByOrderIndexAsc(id);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("contest", contest);
@@ -64,7 +66,7 @@ public class ContestService {
     @Transactional
     public Contest createContest(String email, Contest contest, List<ContestProblem> problems) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         contest.setCreatedBy(user.getId());
         contest.setCreatedAt(LocalDateTime.now());
         contest.setStatus("UPCOMING");
@@ -82,16 +84,16 @@ public class ContestService {
     @Transactional
     public ContestSubmission submitSolution(String email, Long contestId, Long problemId, String code, String language) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         Contest contest = contestRepo.findById(contestId)
-                .orElseThrow(() -> new RuntimeException("Contest not found"));
+                .orElseThrow(() -> new NotFoundException("Contest not found"));
 
         // FIX C2: Use deriveStatus() instead of stale DB field.
         // contest.getStatus() holds the value from creation time ("UPCOMING") and is never
         // updated by listContests(). deriveStatus() computes the real-time status.
         String currentStatus = deriveStatus(contest, LocalDateTime.now());
         if (!"ACTIVE".equals(currentStatus)) {
-            throw new RuntimeException("Contest is not active");
+            throw new BadRequestException("Contest is not active");
         }
 
         ContestSubmission sub = new ContestSubmission();
@@ -103,7 +105,7 @@ public class ContestService {
         sub.setUserName(user.getName());
         // Score is calculated based on submission — simplified to points based on problem difficulty
         ContestProblem problem = problemRepo.findById(problemId)
-                .orElseThrow(() -> new RuntimeException("Problem not found"));
+                .orElseThrow(() -> new NotFoundException("Problem not found"));
         sub.setScore(problem.getPoints());
         sub.setSubmittedAt(LocalDateTime.now());
         return submissionRepo.save(sub);

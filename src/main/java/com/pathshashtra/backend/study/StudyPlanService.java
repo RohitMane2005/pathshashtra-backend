@@ -3,6 +3,8 @@ package com.pathshashtra.backend.study;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pathshashtra.backend.common.JsonCleaner;
+import com.pathshashtra.backend.exception.ForbiddenException;
+import com.pathshashtra.backend.exception.NotFoundException;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.slf4j.Logger;
@@ -117,10 +119,10 @@ public class StudyPlanService {
         User user = getUser(email);
 
         StudyTopic topic = topicRepository.findById(request.getTopicId())
-                .orElseThrow(() -> new RuntimeException("Topic not found"));
+                .orElseThrow(() -> new NotFoundException("Topic not found"));
 
         if (!topic.getStudyPlan().getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized");
+            throw new ForbiddenException("Unauthorized");
         }
 
         topic.setStatus(request.getStatus());
@@ -176,7 +178,7 @@ public class StudyPlanService {
 
     private User getUser(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
     }
 
     private void saveTopicsFromPlan(StudyPlan plan, String planJson) {

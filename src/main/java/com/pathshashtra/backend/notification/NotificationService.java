@@ -1,5 +1,7 @@
 package com.pathshashtra.backend.notification;
 
+import com.pathshashtra.backend.exception.ForbiddenException;
+import com.pathshashtra.backend.exception.NotFoundException;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.data.domain.Page;
@@ -37,20 +39,20 @@ public class NotificationService {
 
     public Page<Notification> getNotifications(String email, int page) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         return notifRepo.findByUserIdOrderByCreatedAtDesc(user.getId(), PageRequest.of(page, 20));
     }
 
     public long getUnreadCount(String email) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         return notifRepo.countByUserIdAndIsReadFalse(user.getId());
     }
 
     @Transactional
     public void markRead(String email, Long notifId) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         notifRepo.findById(notifId).ifPresent(n -> {
             if (n.getUserId().equals(user.getId())) {
                 n.setRead(true);
@@ -67,7 +69,7 @@ public class NotificationService {
     @Transactional
     public void markAllRead(String email) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         notifRepo.markAllReadByUserId(user.getId());
     }
 }

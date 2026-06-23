@@ -58,7 +58,11 @@ public class OtpService {
         String key = PREFIX + email.toLowerCase().trim();
         String stored = redisTemplate.opsForValue().get(key);
         if (stored == null) return false;
-        if (!stored.equals(otp.trim())) return false;
+        // HIGH-01 FIX: Constant-time comparison prevents timing attacks.
+        // String.equals() returns early on first mismatch, leaking info about correct digits.
+        if (!java.security.MessageDigest.isEqual(
+                stored.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                otp.trim().getBytes(java.nio.charset.StandardCharsets.UTF_8))) return false;
         // Single-use: delete on success
         redisTemplate.delete(key);
         return true;

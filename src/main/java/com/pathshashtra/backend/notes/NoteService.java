@@ -1,6 +1,8 @@
 package com.pathshashtra.backend.notes;
 
 import com.pathshashtra.backend.common.HtmlSanitizer;
+import com.pathshashtra.backend.exception.ForbiddenException;
+import com.pathshashtra.backend.exception.NotFoundException;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.stereotype.Service;
@@ -24,7 +26,7 @@ public class NoteService {
 
     public List<Note> getNotes(String email, String category, String search) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         if (search != null && !search.isBlank()) {
             return noteRepo.search(user.getId(), search.trim());
         }
@@ -41,7 +43,7 @@ public class NoteService {
     @Transactional
     public Note createNote(String email, NoteRequest request) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         Note note = new Note();
         note.setUserId(user.getId());
         note.setTitle(htmlSanitizer.sanitize(request.getTitle(), 200));
@@ -57,11 +59,11 @@ public class NoteService {
     @Transactional
     public Note updateNote(String email, Long noteId, NoteRequest request) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         Note note = noteRepo.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note not found"));
+                .orElseThrow(() -> new NotFoundException("Note not found"));
         if (!note.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         note.setTitle(htmlSanitizer.sanitize(request.getTitle(), 200));
         note.setContent(htmlSanitizer.sanitize(request.getContent(), 50000));
@@ -74,11 +76,11 @@ public class NoteService {
     @Transactional
     public void deleteNote(String email, Long noteId) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         Note note = noteRepo.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note not found"));
+                .orElseThrow(() -> new NotFoundException("Note not found"));
         if (!note.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         noteRepo.delete(note);
     }
@@ -86,11 +88,11 @@ public class NoteService {
     @Transactional
     public Note togglePin(String email, Long noteId) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         Note note = noteRepo.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note not found"));
+                .orElseThrow(() -> new NotFoundException("Note not found"));
         if (!note.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         note.setPinned(!note.isPinned());
         return noteRepo.save(note);

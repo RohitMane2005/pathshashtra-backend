@@ -13,6 +13,14 @@ public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
+    /**
+     * S-4 FIX: Dummy bcrypt hash used to equalize response time when the user is not found.
+     * Without this, an attacker can distinguish "user exists" from "user doesn't exist"
+     * by measuring response times (~300ms difference for bcrypt rounds).
+     */
+    private static final String DUMMY_BCRYPT_HASH =
+            "$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ012345";
+
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
@@ -27,7 +35,7 @@ public class AuthService {
         return userRepository.findByEmail(email).isPresent();
     }
 
-    /** Register from DTO -- no mass-assignment risk. Returns JWT directly. */
+    /** Register from DTO -- no mass-assignment risk. Returns message (JWT goes in cookie only). */
     public AuthResponse register(RegisterRequest request) {
         User user = new User();
         user.setName(request.getName());
@@ -36,7 +44,12 @@ public class AuthService {
         user.setRole("STUDENT");
         userRepository.save(user);
         log.info("Registered user: {}", request.getEmail());
-        return new AuthResponse(jwtUtil.generateToken(user.getEmail(), user.getRole()));
+        return new AuthResponse("Registration successful");
+    }
+
+    /** Generates a JWT token for a given email+role — used by controller to set cookie. */
+    public String generateToken(String email, String role) {
+        return jwtUtil.generateToken(email, role);
     }
 
     /**
@@ -48,8 +61,9 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElse(null);
 
-        // No user found — generic failure
+        // No user found — run dummy bcrypt to equalize timing, then return generic failure
         if (user == null) {
+            passwordEncoder.matches(request.getPassword(), DUMMY_BCRYPT_HASH);
             return null;
         }
 
@@ -68,6 +82,6 @@ public class AuthService {
             return null;
         }
 
-        return new AuthResponse(jwtUtil.generateToken(user.getEmail(), user.getRole()));
+        return new AuthResponse("Login successful");
     }
 }

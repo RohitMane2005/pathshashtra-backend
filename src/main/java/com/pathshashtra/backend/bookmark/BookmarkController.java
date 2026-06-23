@@ -71,7 +71,7 @@ public class BookmarkController {
 
     private User getUser(Authentication auth) {
         return userRepository.findByEmail(auth.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new com.pathshashtra.backend.exception.NotFoundException("User not found"));
     }
 
     @Getter

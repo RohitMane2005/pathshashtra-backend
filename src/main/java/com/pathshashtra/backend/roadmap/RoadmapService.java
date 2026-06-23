@@ -3,6 +3,9 @@ package com.pathshashtra.backend.roadmap;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pathshashtra.backend.common.JsonCleaner;
+import com.pathshashtra.backend.exception.ForbiddenException;
+import com.pathshashtra.backend.exception.NotFoundException;
+import com.pathshashtra.backend.exception.ServiceUnavailableException;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.stereotype.Service;
@@ -41,7 +44,7 @@ public class RoadmapService {
         User user = getUser(email);
         String rawJson = groqRoadmapService.generateRoadmap(request, user.getName());
         String cleaned = jsonCleaner.clean(rawJson);
-        if (cleaned == null) throw new RuntimeException("AI returned empty roadmap response");
+        if (cleaned == null) throw new ServiceUnavailableException("AI returned empty roadmap response");
 
         try {
             JsonNode roadmapNode = objectMapper.readTree(cleaned);
@@ -57,7 +60,7 @@ public class RoadmapService {
 
             return roadmapNode;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse roadmap: " + e.getMessage());
+            throw new ServiceUnavailableException("Failed to parse roadmap: " + e.getMessage());
         }
     }
 
@@ -92,22 +95,22 @@ public class RoadmapService {
     public JsonNode getRoadmapById(Long id, String email) {
         User user = getUser(email);
         Roadmap roadmap = roadmapRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Roadmap not found"));
+                .orElseThrow(() -> new NotFoundException("Roadmap not found"));
 
         // Ownership check — prevents user A from reading user B's roadmap
         if (!roadmap.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Roadmap not found");
+            throw new ForbiddenException("Roadmap not found");
         }
 
         try {
             return objectMapper.readTree(roadmap.getRoadmapJson());
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse roadmap");
+            throw new ServiceUnavailableException("Failed to parse roadmap");
         }
     }
 
     private User getUser(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
     }
 }

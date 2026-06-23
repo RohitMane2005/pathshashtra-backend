@@ -22,4 +22,9 @@ public interface StudyTopicRepository extends JpaRepository<StudyTopic, Long> {
     /** FIX: grouped aggregate for leaderboard — avoids N+1 */
     @Query("SELECT t.studyPlan.user.id, COUNT(t) FROM StudyTopic t WHERE t.status = 'COMPLETED' GROUP BY t.studyPlan.user.id")
     List<Object[]> countCompletedGroupedByUser();
+
+    /** Weekly report: count completed topics for a user within a date range */
+    @Query("SELECT COUNT(t) FROM StudyTopic t WHERE t.studyPlan.user.id = :userId " +
+           "AND t.status = 'COMPLETED' AND t.studyPlan.createdAt BETWEEN :start AND :end")
+    long countByStudyPlanUserIdAndCompletedTrue(Long userId, java.time.LocalDateTime start, java.time.LocalDateTime end);
 }

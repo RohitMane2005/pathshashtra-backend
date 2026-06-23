@@ -7,6 +7,7 @@ import com.pathshashtra.backend.security.OAuth2LoginFailureHandler;
 import com.pathshashtra.backend.security.OAuth2LoginSuccessHandler;
 import com.pathshashtra.backend.security.TokenBlacklist;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -35,6 +36,9 @@ public class SecurityConfig {
     private final OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
     private final StringRedisTemplate redisTemplate;
 
+    @Value("${app.cookie.same-site:Lax}")
+    private String cookieSameSite;
+
     public SecurityConfig(JwtUtil jwtUtil, TokenBlacklist tokenBlacklist, ObjectMapper objectMapper,
                           GlobalRateLimitFilter globalRateLimitFilter,
                           OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler,
@@ -60,13 +64,33 @@ public class SecurityConfig {
         http
             .cors(cors -> {})
             /**
-             * CRIT-01 FIX: CSRF is disabled because auth cookies use SameSite=Lax.
-             * SameSite=Lax instructs browsers to NOT send cookies on cross-origin
-             * POST/PUT/DELETE requests, which is the exact protection CSRF tokens provide.
-             * This is the modern, recommended approach for API-first backends.
-             * See: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#samesite-cookie-attribute
+             * CRIT-01 FIX: CSRF protection is conditional on the SameSite cookie attribute.
+             * - SameSite=Lax: browser refuses to send cookies on cross-origin POST/DELETE,
+             *   so CSRF tokens are redundant → disable for simpler API integration.
+             * - SameSite=None (required when frontend/backend are on different domains):
+             *   browser WILL send cookies cross-origin, so CSRF tokens are essential.
+             * See: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
              */
-            .csrf(csrf -> csrf.disable())
+            .csrf(csrf -> {
+                if ("None".equalsIgnoreCase(cookieSameSite)) {
+                    // SameSite=None provides zero CSRF protection — enable CSRF tokens.
+                    // CookieCsrfTokenRepository puts X-XSRF-TOKEN in a readable cookie
+                    // that the frontend reads and sends back in a header on state-changing requests.
+                    csrf.csrfTokenRepository(
+                        org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse()
+                    ).csrfTokenRequestHandler(
+                        new org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler()
+                    ).ignoringRequestMatchers(
+                        // Public auth endpoints don't have a CSRF cookie yet
+                        "/api/auth/login", "/api/auth/register", "/api/auth/logout",
+                        "/api/auth/exchange-code", "/api/auth/forgot-password",
+                        "/api/auth/reset-password", "/api/auth/reset-password/validate"
+                    );
+                } else {
+                    // SameSite=Lax or Strict — browser handles CSRF natively
+                    csrf.disable();
+                }
+            })
             .formLogin(form -> form.disable())
             .httpBasic(basic -> basic.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))

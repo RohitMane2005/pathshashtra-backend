@@ -26,7 +26,7 @@ public class UserProfileController {
     public ResponseEntity<UserProfile> getProfile(Authentication authentication) {
         try {
             return ResponseEntity.ok(service.getProfile(authentication.getName()));
-        } catch (RuntimeException e) {
+        } catch (com.pathshashtra.backend.exception.NotFoundException e) {
             // Profile not yet created — return empty 204 instead of 404 error
             return ResponseEntity.noContent().build();
         }

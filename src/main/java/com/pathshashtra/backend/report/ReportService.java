@@ -2,11 +2,13 @@ package com.pathshashtra.backend.report;
 
 import com.pathshashtra.backend.coding.CodingProblemRepository;
 import com.pathshashtra.backend.quiz.QuizRepository;
+import com.pathshashtra.backend.exception.ForbiddenException;
+import com.pathshashtra.backend.exception.NotFoundException;
 import com.pathshashtra.backend.study.StudyTopicRepository;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
-import com.pathshashtra.backend.user.UserService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -32,25 +34,33 @@ public class ReportService {
         this.topicRepo = topicRepo;
     }
 
+    @Transactional(readOnly = true)
     public List<WeeklyReport> getReports(String email) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         return reportRepo.findByUserIdOrderByWeekStartDesc(user.getId());
     }
 
     /** Live stats for the current week */
+    @Transactional(readOnly = true)
     public Map<String, Object> getCurrentWeekStats(String email) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         LocalDate today = LocalDate.now();
         LocalDate weekStart = today.with(DayOfWeek.MONDAY);
         LocalDate weekEnd = weekStart.plusDays(6);
+        LocalDateTime weekStartTime = weekStart.atStartOfDay();
+        LocalDateTime weekEndTime = weekEnd.atTime(23, 59, 59);
 
-        long problems = codingRepo.countSolvedByUserId(user.getId());
-        long topics = topicRepo.countCompletedByUserId(user.getId());
-        long quizzes = quizRepo.countByUserId(user.getId());
-        long xp = problems * 50 + topics * 30 + quizzes * 100;
+        // MED-04 FIX: Use date-bounded counts for weekly stats instead of all-time.
+        // These use createdAt-based queries scoped to the current week.
+        long problems = codingRepo.countByUserIdAndStatusAndCreatedAtBetween(
+                user.getId(), "SOLVED", weekStartTime, weekEndTime);
+        long topics = topicRepo.countByStudyPlanUserIdAndCompletedTrue(
+                user.getId(), weekStartTime, weekEndTime);
+        long quizzes = quizRepo.countByUserIdAndCreatedAtBetween(
+                user.getId(), weekStartTime, weekEndTime);
 
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("weekStart", weekStart);
@@ -58,6 +68,9 @@ public class ReportService {
         stats.put("problemsSolved", problems);
         stats.put("topicsCompleted", topics);
         stats.put("quizzesCompleted", quizzes);
+
+        // XP scoring: 10xp per problem, 5xp per topic, 15xp per quiz
+        long xp = (problems * 10) + (topics * 5) + (quizzes * 15);
         stats.put("xpTotal", xp);
         stats.put("level", xp / 500 + 1);
 
@@ -74,13 +87,14 @@ public class ReportService {
         return stats;
     }
 
+    @Transactional(readOnly = true)
     public WeeklyReport getReport(String email, Long reportId) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         WeeklyReport report = reportRepo.findById(reportId)
-                .orElseThrow(() -> new RuntimeException("Report not found"));
+                .orElseThrow(() -> new NotFoundException("Report not found"));
         if (!report.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         return report;
     }

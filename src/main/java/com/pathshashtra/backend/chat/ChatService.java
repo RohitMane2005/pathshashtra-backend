@@ -1,6 +1,9 @@
 package com.pathshashtra.backend.chat;
 
 import com.pathshashtra.backend.common.GroqClient;
+import com.pathshashtra.backend.common.HtmlSanitizer;
+import com.pathshashtra.backend.exception.ForbiddenException;
+import com.pathshashtra.backend.exception.NotFoundException;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.stereotype.Service;
@@ -22,6 +25,7 @@ public class ChatService {
     private final ChatMessageRepository messageRepo;
     private final UserRepository userRepo;
     private final GroqClient groqClient;
+    private final HtmlSanitizer htmlSanitizer;
 
     private static final String SYSTEM_PROMPT =
         "You are PathShashtra AI Assistant — a helpful, friendly tutor for Indian students. " +
@@ -33,23 +37,26 @@ public class ChatService {
     public ChatService(ChatSessionRepository sessionRepo,
                        ChatMessageRepository messageRepo,
                        UserRepository userRepo,
-                       GroqClient groqClient) {
+                       GroqClient groqClient,
+                       HtmlSanitizer htmlSanitizer) {
         this.sessionRepo = sessionRepo;
         this.messageRepo = messageRepo;
         this.userRepo = userRepo;
         this.groqClient = groqClient;
+        this.htmlSanitizer = htmlSanitizer;
     }
 
+    @Transactional(readOnly = true)
     public List<ChatSession> getSessions(String email) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         return sessionRepo.findByUserIdOrderByCreatedAtDesc(user.getId());
     }
 
     @Transactional
     public ChatSession createSession(String email) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         ChatSession session = new ChatSession();
         session.setUserId(user.getId());
         session.setTitle("New Chat");
@@ -57,13 +64,14 @@ public class ChatService {
         return sessionRepo.save(session);
     }
 
+    @Transactional(readOnly = true)
     public List<ChatMessage> getMessages(String email, Long sessionId) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         ChatSession session = sessionRepo.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Session not found"));
+                .orElseThrow(() -> new NotFoundException("Session not found"));
         if (!session.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         return messageRepo.findBySessionIdOrderByCreatedAtAsc(sessionId);
     }
@@ -71,25 +79,31 @@ public class ChatService {
     @Transactional
     public ChatMessage sendMessage(String email, Long sessionId, String content) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         ChatSession session = sessionRepo.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Session not found"));
+                .orElseThrow(() -> new NotFoundException("Session not found"));
         if (!session.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
+
+        // MED-06 FIX: Sanitize chat content before storage to prevent stored XSS
+        String sanitizedContent = htmlSanitizer.sanitize(content.trim(), 5000);
 
         // Save user message
         ChatMessage userMsg = new ChatMessage();
         userMsg.setSessionId(sessionId);
         userMsg.setUserId(user.getId());
         userMsg.setRole("USER");
-        userMsg.setContent(content);
+        userMsg.setContent(sanitizedContent);
         userMsg.setCreatedAt(LocalDateTime.now());
         messageRepo.save(userMsg);
 
-        // Update session title from first message
+        // Update session title from first message — use sanitized content to prevent stored XSS
         if ("New Chat".equals(session.getTitle())) {
-            session.setTitle(content.length() > 50 ? content.substring(0, 50) + "..." : content);
+            String titleText = sanitizedContent.length() > 50
+                    ? sanitizedContent.substring(0, 50) + "..."
+                    : sanitizedContent;
+            session.setTitle(titleText);
             sessionRepo.save(session);
         }
 
@@ -111,11 +125,11 @@ public class ChatService {
     @Transactional
     public void deleteSession(String email, Long sessionId) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         ChatSession session = sessionRepo.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Session not found"));
+                .orElseThrow(() -> new NotFoundException("Session not found"));
         if (!session.getUserId().equals(user.getId())) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         messageRepo.deleteBySessionId(sessionId);
         sessionRepo.delete(session);

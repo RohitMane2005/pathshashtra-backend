@@ -92,7 +92,10 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             log.info("Registered new OAuth2 user: {} via {}", email, registrationId);
         }
 
-        String token = jwtUtil.generateToken(user.getEmail());
+        // HIGH-05 FIX: Use the user's actual role from the DB, not the default STUDENT.
+        // Previously used the 1-arg overload which always defaulted to STUDENT,
+        // causing admins who login via OAuth to lose their admin privileges.
+        String token = jwtUtil.generateToken(user.getEmail(), user.getRole());
 
         // ── Invalidate HTTP session after OAuth completes ─────────────────
         // Session was only needed for OAuth state storage. JWT is now the auth mechanism.

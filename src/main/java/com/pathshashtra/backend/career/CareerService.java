@@ -3,6 +3,9 @@ package com.pathshashtra.backend.career;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pathshashtra.backend.common.JsonCleaner;
+import com.pathshashtra.backend.exception.BadRequestException;
+import com.pathshashtra.backend.exception.NotFoundException;
+import com.pathshashtra.backend.exception.ServiceUnavailableException;
 import com.pathshashtra.backend.profile.UserProfileRepository;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
@@ -46,7 +49,7 @@ public class CareerService {
             JsonNode root = jsonCleaner.cleanAndParse(questionsJson);
             return Map.of("questions", root.path("questions"));
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse career questions: " + e.getMessage());
+            throw new ServiceUnavailableException("Failed to parse career questions: " + e.getMessage());
         }
     }
 
@@ -63,7 +66,7 @@ public class CareerService {
         try {
             answersJson = objectMapper.writeValueAsString(request.getAnswers());
         } catch (Exception e) {
-            throw new RuntimeException("Failed to serialize answers");
+            throw new BadRequestException("Failed to serialize answers");
         }
 
         String resultJson = careerAIService.analyzeAssessment(profileCtx, questionsJson, answersJson);
@@ -115,10 +118,10 @@ public class CareerService {
         User user = getUser(email);
         CareerAssessment assessment = assessmentRepository
                 .findByIdAndUserId(assessmentId, user.getId())
-                .orElseThrow(() -> new RuntimeException("Assessment not found"));
+                .orElseThrow(() -> new NotFoundException("Assessment not found"));
 
         if (assessment.getResultJson() == null)
-            throw new RuntimeException("Assessment not completed yet");
+            throw new BadRequestException("Assessment not completed yet");
 
         return parseResult(assessment.getResultJson());
     }
@@ -127,7 +130,7 @@ public class CareerService {
 
     private User getUser(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
     }
 
     private String buildProfileContext(User user) {
@@ -202,7 +205,7 @@ public class CareerService {
                     .build();
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse career result: " + e.getMessage());
+            throw new ServiceUnavailableException("Failed to parse career result: " + e.getMessage());
         }
     }
 }

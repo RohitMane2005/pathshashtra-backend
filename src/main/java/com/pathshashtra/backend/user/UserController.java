@@ -17,9 +17,10 @@ public class UserController {
         this.userService = userService;
     }
 
+    /** HIGH-02 FIX: Return UserResponse DTO instead of raw entity to prevent leaking internal fields. */
     @GetMapping("/me")
-    public ResponseEntity<User> getCurrentUser(Authentication auth) {
-        return ResponseEntity.ok(userService.findByEmail(auth.getName()));
+    public ResponseEntity<UserResponse> getCurrentUser(Authentication auth) {
+        return ResponseEntity.ok(UserResponse.from(userService.findByEmail(auth.getName())));
     }
 
     /** Returns current user's login streak (consecutive days active). */

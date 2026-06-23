@@ -86,7 +86,7 @@ public class GroqClient {
                         apiUrl, HttpMethod.POST, entity, String.class);
 
                 if (response.getBody() == null)
-                    throw new RuntimeException("AI returned empty response");
+                    throw new com.pathshashtra.backend.exception.ServiceUnavailableException("AI returned empty response");
                 JsonNode root = objectMapper.readTree(response.getBody());
                 return root.path("choices").get(0).path("message").path("content").asText();
 

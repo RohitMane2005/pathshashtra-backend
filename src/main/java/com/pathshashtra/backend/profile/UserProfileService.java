@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.profile;
 
+import com.pathshashtra.backend.exception.NotFoundException;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.stereotype.Service;
@@ -17,7 +18,7 @@ public class UserProfileService {
 
     public UserProfile saveProfile(String email, UserProfileRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         UserProfile existing = profileRepository.findByUserId(user.getId())
                 .orElse(new UserProfile());
@@ -33,8 +34,8 @@ public class UserProfileService {
 
     public UserProfile getProfile(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         return profileRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Profile not found"));
+                .orElseThrow(() -> new NotFoundException("Profile not found"));
     }
 }

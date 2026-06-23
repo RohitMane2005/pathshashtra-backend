@@ -67,7 +67,7 @@ public class AchievementService {
 
     public List<Map<String, Object>> getAllBadges(String email) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new com.pathshashtra.backend.exception.NotFoundException("User not found"));
         List<Achievement> unlocked = achievementRepo.findByUserId(user.getId());
         Set<String> unlockedKeys = new HashSet<>();
         Map<String, LocalDateTime> unlockedDates = new HashMap<>();

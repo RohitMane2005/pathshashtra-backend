@@ -20,4 +20,8 @@ public interface QuizRepository extends JpaRepository<QuizSession, Long> {
     /** FIX: grouped aggregate for leaderboard — avoids N+1 */
     @Query("SELECT q.user.id, COUNT(q) FROM QuizSession q WHERE q.status = 'COMPLETED' GROUP BY q.user.id")
     List<Object[]> countCompletedGroupedByUser();
+
+    /** Weekly report: count quizzes within a date range */
+    @Query("SELECT COUNT(q) FROM QuizSession q WHERE q.user.id = :userId AND q.createdAt BETWEEN :start AND :end")
+    long countByUserIdAndCreatedAtBetween(Long userId, java.time.LocalDateTime start, java.time.LocalDateTime end);
 }

@@ -1,6 +1,7 @@
 package com.pathshashtra.backend.discussion;
 
 import com.pathshashtra.backend.common.HtmlSanitizer;
+import com.pathshashtra.backend.exception.NotFoundException;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.data.domain.Page;
@@ -33,13 +34,16 @@ public class DiscussionService {
         this.htmlSanitizer = htmlSanitizer;
     }
 
+    @Transactional(readOnly = true)
     public Page<DiscussionPost> listPosts(String tag, String search, String sort, int page) {
         Pageable pageable = PageRequest.of(page, 20);
         if (search != null && !search.isBlank()) {
             return postRepo.search(search.trim(), pageable);
         }
         if (tag != null && !tag.isBlank()) {
-            return postRepo.findByTag(tag.trim(), pageable);
+            // S-6 FIX: Escape SQL LIKE wildcards to prevent tag='%' matching all posts
+            String safeTag = tag.trim().replace("%", "\\%").replace("_", "\\_");
+            return postRepo.findByTag(safeTag, pageable);
         }
         if ("top".equals(sort)) {
             return postRepo.findAllByOrderByUpvotesDesc(pageable);
@@ -47,9 +51,10 @@ public class DiscussionService {
         return postRepo.findAllByOrderByCreatedAtDesc(pageable);
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> getPost(Long id) {
         DiscussionPost post = postRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Post not found"));
+                .orElseThrow(() -> new NotFoundException("Post not found"));
         List<DiscussionReply> replies = replyRepo.findByPostIdOrderByCreatedAtAsc(id);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("post", post);
@@ -60,7 +65,7 @@ public class DiscussionService {
     @Transactional
     public DiscussionPost createPost(String email, String title, String content, String tags) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         DiscussionPost post = new DiscussionPost();
         post.setUserId(user.getId());
         post.setAuthorName(user.getName());
@@ -75,9 +80,9 @@ public class DiscussionService {
     @Transactional
     public DiscussionReply addReply(String email, Long postId, String content) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         DiscussionPost post = postRepo.findById(postId)
-                .orElseThrow(() -> new RuntimeException("Post not found"));
+                .orElseThrow(() -> new NotFoundException("Post not found"));
 
         DiscussionReply reply = new DiscussionReply();
         reply.setPostId(postId);
@@ -95,7 +100,7 @@ public class DiscussionService {
     @Transactional
     public Map<String, Object> toggleVote(String email, String targetType, Long targetId) {
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         Optional<DiscussionVote> existing = voteRepo.findByUserIdAndTargetTypeAndTargetId(
                 user.getId(), targetType, targetId);

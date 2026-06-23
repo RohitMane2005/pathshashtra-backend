@@ -106,10 +106,20 @@ public class PasswordResetService {
     public void resetPassword(String rawToken, String newPassword) {
         // SEC-07: look up by hash, not raw token
         PasswordResetToken resetToken = resetRepository.findByToken(sha256(rawToken))
-                .orElseThrow(() -> new RuntimeException("Invalid or expired reset link"));
+                .orElseThrow(() -> new com.pathshashtra.backend.exception.BadRequestException("Invalid or expired reset link"));
 
-        if (resetToken.isUsed()) throw new RuntimeException("Reset link already used");
-        if (resetToken.isExpired()) throw new RuntimeException("Reset link has expired. Please request a new one.");
+        if (resetToken.isUsed()) throw new com.pathshashtra.backend.exception.BadRequestException("Reset link already used");
+        if (resetToken.isExpired()) throw new com.pathshashtra.backend.exception.BadRequestException("Reset link has expired. Please request a new one.");
+
+        // HIGH-03 FIX: Defense-in-depth password validation.
+        // Controller DTO has @Size and @Pattern, but we enforce here too in case
+        // a future internal caller bypasses the controller validation.
+        if (newPassword == null || newPassword.length() < 8 || newPassword.length() > 128) {
+            throw new com.pathshashtra.backend.exception.BadRequestException("Password must be 8-128 characters");
+        }
+        if (!newPassword.matches(".*[A-Z].*") || !newPassword.matches(".*\\d.*")) {
+            throw new com.pathshashtra.backend.exception.BadRequestException("Password must contain at least one uppercase letter and one number");
+        }
 
         User user = resetToken.getUser();
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -136,7 +146,7 @@ public class PasswordResetService {
             byte[] hash = md.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
-            throw new RuntimeException("SHA-256 not available", e);
+            throw new com.pathshashtra.backend.exception.ServiceUnavailableException("SHA-256 not available");
         }
     }
 
@@ -167,7 +177,7 @@ public class PasswordResetService {
             log.info("Password reset email sent to {}", toEmail);
         } catch (Exception e) {
             log.error("Failed to send reset email to {}: {}", toEmail, e.getMessage());
-            throw new RuntimeException("Failed to send reset email. Please try again.");
+            throw new com.pathshashtra.backend.exception.ServiceUnavailableException("Failed to send reset email. Please try again.");
         }
     }
 

@@ -3,6 +3,10 @@ package com.pathshashtra.backend.quiz;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pathshashtra.backend.common.JsonCleaner;
+import com.pathshashtra.backend.exception.BadRequestException;
+import com.pathshashtra.backend.exception.ConflictException;
+import com.pathshashtra.backend.exception.NotFoundException;
+import com.pathshashtra.backend.exception.ServiceUnavailableException;
 import com.pathshashtra.backend.profile.UserProfileRepository;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
@@ -22,6 +26,8 @@ import java.util.Base64;
  */
 @Service
 public class QuizService {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final QuizRepository quizRepository;
     private final UserRepository userRepository;
@@ -61,35 +67,8 @@ public class QuizService {
 
     @Transactional
     public QuizResult submitQuiz(String email, QuizSubmitRequest request) {
-        User user = getUser(email);
-        QuizSession session = quizRepository
-                .findByIdAndUserId(request.getSessionId(), user.getId())
-                .orElseThrow(() -> new RuntimeException("Quiz session not found"));
-
-        if (session.getStatus() == QuizSession.QuizStatus.COMPLETED) {
-            throw new RuntimeException("Quiz already completed");
-        }
-
-        try {
-            session.setAnswersJson(objectMapper.writeValueAsString(request.getAnswers()));
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to save answers");
-        }
-
-        String profileContext = buildProfileContext(user);
-        String resultJson = claudeApiService.analyzeQuizAnswers(
-                profileContext, session.getQuestionsJson(), session.getAnswersJson());
-
-        session.setResultJson(resultJson);
-        session.setStatus(QuizSession.QuizStatus.COMPLETED);
-        session.setCompletedAt(LocalDateTime.now());
-
-        byte[] bytes = new byte[16];
-        new SecureRandom().nextBytes(bytes);
-        session.setShareToken(Base64.getUrlEncoder().withoutPadding().encodeToString(bytes));
-        quizRepository.save(session);
-
-        return parseQuizResult(resultJson);
+        QuizSession session = doSubmit(email, request);
+        return parseQuizResult(session.getResultJson());
     }
 
     public List<QuizResultSummary> getMyResults(String email) {
@@ -115,48 +94,21 @@ public class QuizService {
         User user = getUser(email);
         QuizSession session = quizRepository
                 .findByIdAndUserId(sessionId, user.getId())
-                .orElseThrow(() -> new RuntimeException("Result not found"));
+                .orElseThrow(() -> new NotFoundException("Result not found"));
 
-        if (session.getResultJson() == null) throw new RuntimeException("Quiz not completed yet");
+        if (session.getResultJson() == null) throw new BadRequestException("Quiz not completed yet");
         return parseQuizResult(session.getResultJson());
     }
 
     /**
-     * FIX BUG 14: Inlined submission logic to avoid double DB lookups.
-     * Previously called submitQuiz() then re-fetched the same session and user.
-     * Now fetches each resource exactly once.
+     * B-1 FIX: submitQuizWithToken now delegates to shared doSubmit() helper.
+     * Eliminates the duplicated validation/persistence logic that was in both
+     * submitQuiz() and submitQuizWithToken().
      */
     @Transactional
     public Map<String, Object> submitQuizWithToken(String email, QuizSubmitRequest request) {
-        User user = getUser(email);
-        QuizSession session = quizRepository
-                .findByIdAndUserId(request.getSessionId(), user.getId())
-                .orElseThrow(() -> new RuntimeException("Quiz session not found"));
-
-        if (session.getStatus() == QuizSession.QuizStatus.COMPLETED) {
-            throw new RuntimeException("Quiz already completed");
-        }
-
-        try {
-            session.setAnswersJson(objectMapper.writeValueAsString(request.getAnswers()));
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to save answers");
-        }
-
-        String profileContext = buildProfileContext(user);
-        String resultJson = claudeApiService.analyzeQuizAnswers(
-                profileContext, session.getQuestionsJson(), session.getAnswersJson());
-
-        session.setResultJson(resultJson);
-        session.setStatus(QuizSession.QuizStatus.COMPLETED);
-        session.setCompletedAt(LocalDateTime.now());
-
-        byte[] bytes = new byte[16];
-        new SecureRandom().nextBytes(bytes);
-        session.setShareToken(Base64.getUrlEncoder().withoutPadding().encodeToString(bytes));
-        quizRepository.save(session);
-
-        QuizResult result = parseQuizResult(resultJson);
+        QuizSession session = doSubmit(email, request);
+        QuizResult result = parseQuizResult(session.getResultJson());
 
         Map<String, Object> resp = new java.util.LinkedHashMap<>();
         resp.put("shareToken", session.getShareToken());
@@ -168,11 +120,47 @@ public class QuizService {
         return resp;
     }
 
+    /**
+     * Shared submission logic used by both submitQuiz() and submitQuizWithToken().
+     * Validates session state, saves answers, calls AI, generates share token.
+     */
+    private QuizSession doSubmit(String email, QuizSubmitRequest request) {
+        User user = getUser(email);
+        QuizSession session = quizRepository
+                .findByIdAndUserId(request.getSessionId(), user.getId())
+                .orElseThrow(() -> new NotFoundException("Quiz session not found"));
+
+        if (session.getStatus() == QuizSession.QuizStatus.COMPLETED) {
+            throw new ConflictException("Quiz already completed");
+        }
+
+        try {
+            session.setAnswersJson(objectMapper.writeValueAsString(request.getAnswers()));
+        } catch (Exception e) {
+            throw new BadRequestException("Failed to save answers");
+        }
+
+        String profileContext = buildProfileContext(user);
+        String resultJson = claudeApiService.analyzeQuizAnswers(
+                profileContext, session.getQuestionsJson(), session.getAnswersJson());
+
+        session.setResultJson(resultJson);
+        session.setStatus(QuizSession.QuizStatus.COMPLETED);
+        session.setCompletedAt(LocalDateTime.now());
+
+        byte[] bytes = new byte[16];
+        SECURE_RANDOM.nextBytes(bytes);
+        session.setShareToken(Base64.getUrlEncoder().withoutPadding().encodeToString(bytes));
+        quizRepository.save(session);
+
+        return session;
+    }
+
     /** Public read-only result by share token — no auth required. */
     public Map<String, Object> getPublicResult(String shareToken) {
         QuizSession session = quizRepository.findByShareToken(shareToken)
-                .orElseThrow(() -> new RuntimeException("Result not found"));
-        if (session.getResultJson() == null) throw new RuntimeException("Quiz not completed");
+                .orElseThrow(() -> new NotFoundException("Result not found"));
+        if (session.getResultJson() == null) throw new BadRequestException("Quiz not completed");
 
         QuizResult result = parseQuizResult(session.getResultJson());
         Map<String, Object> resp = new HashMap<>();
@@ -187,7 +175,7 @@ public class QuizService {
 
     private User getUser(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
     }
 
     private String buildProfileContext(User user) {
@@ -214,7 +202,7 @@ public class QuizService {
             }
             return new QuizStartResponse(sessionId, questions);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse quiz questions: " + e.getMessage());
+            throw new ServiceUnavailableException("Failed to parse quiz questions: " + e.getMessage());
         }
     }
 
@@ -256,7 +244,7 @@ public class QuizService {
                     .careerMatches(careers).skillGaps(gaps)
                     .roadmap(roadmap).salaryInfo(salary).build();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse quiz result: " + e.getMessage());
+            throw new ServiceUnavailableException("Failed to parse quiz result: " + e.getMessage());
         }
     }
 } // class closes here — after all methods

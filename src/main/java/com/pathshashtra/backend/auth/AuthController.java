@@ -66,8 +66,9 @@ public class AuthController {
         AuthResponse authResponse = authService.register(request);
         log.info("New user registered from ip={}", ip);
 
-        // Set cookie on registration
-        ResponseCookie cookie = jwtUtil.buildCookie(authResponse.getToken());
+        // Generate token and set ONLY as HttpOnly cookie — never in body
+        String token = authService.generateToken(request.getEmail(), "STUDENT");
+        ResponseCookie cookie = jwtUtil.buildCookie(token);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(authResponse);
@@ -102,8 +103,9 @@ public class AuthController {
 
         log.info("Successful login for email={} ip={}", email, ip);
 
-        // CRIT-01 fix: set HttpOnly cookie so JS cannot access the token
-        ResponseCookie cookie = jwtUtil.buildCookie(authResponse.getToken());
+        // AUDIT FIX: Token is set ONLY as HttpOnly cookie — never in response body
+        String token = authService.generateToken(email, "STUDENT");
+        ResponseCookie cookie = jwtUtil.buildCookie(token);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(authResponse);

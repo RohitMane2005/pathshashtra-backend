@@ -27,11 +27,11 @@ public class QuotaController {
         String email = auth.getName();
 
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("roadmap",   quota("ai_roadmap:",      email, 5));
-        response.put("quiz",      quota("ai_quiz:",         email, 3));
-        response.put("codingGen", quota("ai_coding_gen:",   email, 20));
-        response.put("studyPlan", quota("ai_study:",        email, 3));
-        response.put("careerQ",   quota("ai_career_q:",     email, 5));
+        response.put("roadmap",   quota("ai_roadmap:",   email, 5));
+        response.put("quiz",      quota("ai_quiz:",      email, 3));
+        response.put("codingGen", quota("ai_coding:",    email, 20));
+        response.put("studyPlan", quota("ai_study:",     email, 3));
+        response.put("careerQ",   quota("ai_career:",    email, 3));
 
         return ResponseEntity.ok(response);
     }

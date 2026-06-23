@@ -4,6 +4,8 @@ import com.pathshashtra.backend.coding.CodingProblemRepository;
 import com.pathshashtra.backend.notification.NotificationService;
 import com.pathshashtra.backend.quiz.QuizRepository;
 import com.pathshashtra.backend.study.StudyTopicRepository;
+import com.pathshashtra.backend.exception.BadRequestException;
+import com.pathshashtra.backend.exception.NotFoundException;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
 import org.springframework.stereotype.Service;
@@ -37,12 +39,12 @@ public class SocialService {
     @Transactional
     public Map<String, Object> toggleFollow(String email, Long targetUserId) {
         User me = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         if (me.getId().equals(targetUserId)) {
-            throw new RuntimeException("Cannot follow yourself");
+            throw new BadRequestException("Cannot follow yourself");
         }
         User target = userRepo.findById(targetUserId)
-                .orElseThrow(() -> new RuntimeException("Target user not found"));
+                .orElseThrow(() -> new NotFoundException("Target user not found"));
 
         Optional<Follow> existing = followRepo.findByFollowerIdAndFollowingId(me.getId(), targetUserId);
         boolean following;
@@ -67,27 +69,30 @@ public class SocialService {
      * OLD: each Follow → findById + existsBy = 2 queries per follower.
      * NEW: 1 query for all users + 1 query for follow status = 2 total.
      */
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> getFollowing(String email) {
         User me = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         List<Long> followingIds = followRepo.findByFollowerId(me.getId()).stream()
                 .map(Follow::getFollowingId).toList();
         return batchUserMaps(followingIds, me.getId());
     }
 
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> getFollowers(String email) {
         User me = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         List<Long> followerIds = followRepo.findByFollowingId(me.getId()).stream()
                 .map(Follow::getFollowerId).toList();
         return batchUserMaps(followerIds, me.getId());
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> getPublicProfile(String email, Long userId) {
         User me = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         User target = userRepo.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         long problems = codingRepo.countSolvedByUserId(userId);
         long topics = topicRepo.countCompletedByUserId(userId);
@@ -112,9 +117,10 @@ public class SocialService {
      * FIX BUG 4: DB-level search replaces findAll() full table scan.
      * Follow status is batch-checked with a single query instead of N+1.
      */
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> searchUsers(String email, String query) {
         User me = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         // FIX M5: Truncate search input to prevent oversized LIKE queries
         if (query == null || query.isBlank()) return List.of();
@@ -147,7 +153,7 @@ public class SocialService {
 
     public Map<String, Object> compareWith(String email, Long userId) {
         User me = userRepo.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
         Map<String, Object> myStats = getPublicProfile(email, me.getId());
         Map<String, Object> theirStats = getPublicProfile(email, userId);
         return Map.of("me", myStats, "them", theirStats);

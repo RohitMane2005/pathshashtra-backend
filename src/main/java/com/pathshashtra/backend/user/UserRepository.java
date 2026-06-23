@@ -16,9 +16,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.deletedAt IS NULL AND u.id <> :excludeId " +
            "AND LOWER(u.name) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<User> searchByName(String query, Long excludeId, Pageable pageable);
-
-    /** FIX BUG 12: Only load active users for leaderboard. */
-    @Query("SELECT u FROM User u WHERE u.deletedAt IS NULL")
-    List<User> findAllActive();
 }
-

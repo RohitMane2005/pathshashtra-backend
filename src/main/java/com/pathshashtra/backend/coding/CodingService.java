@@ -3,6 +3,8 @@ package com.pathshashtra.backend.coding;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pathshashtra.backend.common.JsonCleaner;
+import com.pathshashtra.backend.exception.BadRequestException;
+import com.pathshashtra.backend.exception.NotFoundException;
 import com.pathshashtra.backend.profile.UserProfileRepository;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
@@ -73,10 +75,10 @@ public class CodingService {
         User user = getUser(email);
         CodingProblem problem = problemRepository
                 .findByIdAndUserId(request.getProblemId(), user.getId())
-                .orElseThrow(() -> new RuntimeException("Problem not found"));
+                .orElseThrow(() -> new NotFoundException("Problem not found"));
 
         if (problem.getHintsUsed() >= 3) {
-            throw new RuntimeException("Maximum 3 hints allowed per problem");
+            throw new BadRequestException("Maximum 3 hints allowed per problem");
         }
 
         String hintJson = grokCodingService.generateHint(
@@ -103,7 +105,7 @@ public class CodingService {
         User user = getUser(email);
         CodingProblem problem = problemRepository
                 .findByIdAndUserId(request.getProblemId(), user.getId())
-                .orElseThrow(() -> new RuntimeException("Problem not found"));
+                .orElseThrow(() -> new NotFoundException("Problem not found"));
 
         String feedbackJson = grokCodingService.reviewCode(
                 problem.getProblemJson(), request.getCode(), request.getLanguage());
@@ -170,7 +172,7 @@ public class CodingService {
         log.debug("Loading problem {} for user {} (id={})", problemId, email, user.getId());
         CodingProblem problem = problemRepository
                 .findByIdAndUserId(problemId, user.getId())
-                .orElseThrow(() -> new RuntimeException("Problem not found"));
+                .orElseThrow(() -> new NotFoundException("Problem not found"));
 
         Map<String, Object> response = new HashMap<>();
         response.put("problemId", problem.getId());
@@ -193,7 +195,7 @@ public class CodingService {
         User user = getUser(email);
         CodingProblem problem = problemRepository
                 .findByIdAndUserId(problemId, user.getId())
-                .orElseThrow(() -> new RuntimeException("Problem not found"));
+                .orElseThrow(() -> new NotFoundException("Problem not found"));
 
         problem.setSubmittedCode(null);
         problem.setFeedbackJson(null);
@@ -224,7 +226,7 @@ public class CodingService {
 
     private User getUser(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
     }
 
     private String extractField(String json, String field, String defaultValue) {
@@ -275,7 +277,7 @@ public class CodingService {
                     .suggestedSpaceComplexity(root.path("suggestedSpaceComplexity").asText())
                     .build();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to parse feedback: " + e.getMessage());
+            throw new com.pathshashtra.backend.exception.ServiceUnavailableException("Failed to parse feedback: " + e.getMessage());
         }
     }
 }

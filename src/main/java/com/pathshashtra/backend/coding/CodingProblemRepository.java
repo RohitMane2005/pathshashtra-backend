@@ -19,4 +19,10 @@ public interface CodingProblemRepository extends JpaRepository<CodingProblem, Lo
     /** FIX: grouped aggregate for leaderboard — avoids N+1 */
     @Query("SELECT p.user.id, COUNT(p) FROM CodingProblem p WHERE p.status = 'SOLVED' GROUP BY p.user.id")
     List<Object[]> countSolvedGroupedByUser();
+
+    /** Weekly report: count problems by status within a date range */
+    @Query("SELECT COUNT(p) FROM CodingProblem p WHERE p.user.id = :userId AND p.status = :status " +
+           "AND p.createdAt BETWEEN :start AND :end")
+    long countByUserIdAndStatusAndCreatedAtBetween(Long userId, String status,
+                                                    java.time.LocalDateTime start, java.time.LocalDateTime end);
 }

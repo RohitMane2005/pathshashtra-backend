@@ -11,7 +11,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class JsonCleaner {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+
+    public JsonCleaner(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     /**
      * Clean then parse — null-safe single entry point for all LLM JSON fields.
