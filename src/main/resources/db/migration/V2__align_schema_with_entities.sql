@@ -71,9 +71,16 @@ ALTER TABLE notes ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN DEFAULT FALSE;
 -- =====================================================================
 ALTER TABLE achievements ADD COLUMN IF NOT EXISTS badge_key VARCHAR(100);
 ALTER TABLE achievements ADD COLUMN IF NOT EXISTS unlocked_at TIMESTAMP;
--- Migrate data from old columns if they exist
-UPDATE achievements SET badge_key = key WHERE badge_key IS NULL AND key IS NOT NULL;
-UPDATE achievements SET unlocked_at = earned_at WHERE unlocked_at IS NULL AND earned_at IS NOT NULL;
+-- Migrate data from old columns if they exist (safe on fresh DBs where old columns never existed)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='achievements' AND column_name='key') THEN
+    UPDATE achievements SET badge_key = key WHERE badge_key IS NULL AND key IS NOT NULL;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='achievements' AND column_name='earned_at') THEN
+    UPDATE achievements SET unlocked_at = earned_at WHERE unlocked_at IS NULL AND earned_at IS NOT NULL;
+  END IF;
+END $$;
 
 -- Drop old unique constraint and add new one
 ALTER TABLE achievements DROP CONSTRAINT IF EXISTS achievements_user_id_key_key;
