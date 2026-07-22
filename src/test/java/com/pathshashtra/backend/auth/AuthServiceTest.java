@@ -92,10 +92,11 @@ class AuthServiceTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches("Password1", "$2a$10$hashedpassword")).thenReturn(true);
 
-        AuthResponse response = authService.login(req);
+        AuthService.LoginResult response = authService.login(req);
 
         assertThat(response).isNotNull();
-        assertThat(response.getMessage()).isEqualTo("Login successful");
+        assertThat(response.message()).isEqualTo("Login successful");
+        assertThat(response.role()).isEqualTo("STUDENT");
     }
 
     @Test
@@ -107,7 +108,7 @@ class AuthServiceTest {
 
         when(userRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());
 
-        AuthResponse response = authService.login(req);
+        AuthService.LoginResult response = authService.login(req);
 
         assertThat(response).isNull();
         // Verify dummy bcrypt comparison was made to equalize response time
@@ -124,7 +125,7 @@ class AuthServiceTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches("WrongPass1", "$2a$10$hashedpassword")).thenReturn(false);
 
-        AuthResponse response = authService.login(req);
+        AuthService.LoginResult response = authService.login(req);
 
         assertThat(response).isNull();
     }
@@ -139,7 +140,7 @@ class AuthServiceTest {
 
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
 
-        AuthResponse response = authService.login(req);
+        AuthService.LoginResult response = authService.login(req);
 
         assertThat(response).isNull();
         // Password should NOT be checked for deleted accounts
@@ -156,7 +157,7 @@ class AuthServiceTest {
 
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
 
-        AuthResponse response = authService.login(req);
+        AuthService.LoginResult response = authService.login(req);
 
         assertThat(response).isNull();
     }
