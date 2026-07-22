@@ -19,12 +19,17 @@ import org.springframework.stereotype.Component;
 public class HtmlSanitizer {
 
     /**
-     * Plain-text only policy — strips ALL HTML tags.
-     * Used for discussion titles, notes, profile fields where only plain text is expected.
+     * HIGH-10 FIX: Strict plain-text policy — strips ALL HTML tags.
+     *
+     * Previously used FORMATTING.and(BLOCKS).and(STYLES) which allowed <b>, <i>,
+     * <p>, <h1>-<h6>, <blockquote>, and inline CSS styles. This contradicted the
+     * "plain text only" intent and allowed users to inject styled content that
+     * could disrupt layout in discussions, notes, and profile fields.
+     *
+     * An empty HtmlPolicyBuilder strips everything — the safest possible policy.
      */
-    private static final PolicyFactory PLAIN_TEXT_POLICY = Sanitizers.FORMATTING
-            .and(Sanitizers.BLOCKS)
-            .and(Sanitizers.STYLES);
+    private static final PolicyFactory PLAIN_TEXT_POLICY =
+            new org.owasp.html.HtmlPolicyBuilder().toFactory();
 
     /**
      * Sanitize input — strips all unsafe HTML including event handlers, scripts, and iframes.

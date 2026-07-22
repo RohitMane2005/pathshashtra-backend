@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.user;
 
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -37,20 +38,18 @@ public class UserController {
     }
 
     /**
-     * FIX H3: Require password verification for account deletion.
-     * A compromised JWT + trivially guessable {"confirm":"DELETE"} body
-     * should not be enough to permanently delete an account.
+     * HIGH-06 FIX: Uses validated DTO instead of raw Map<String, String>.
+     * @Valid triggers JSR-303 validation before method body runs:
+     *   - confirm must be exactly "DELETE" (@Pattern)
+     *   - password max 128 chars (@Size)
+     * GlobalExceptionHandler returns structured field errors on validation failure.
      */
     @DeleteMapping("/me")
     public ResponseEntity<Map<String, String>> deleteAccount(
-            @RequestBody Map<String, String> body,
+            @Valid @RequestBody DeleteAccountRequest request,
             Authentication auth) {
 
-        if (!"DELETE".equals(body.get("confirm"))) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Send { \"confirm\": \"DELETE\", \"password\": \"...\" } to confirm account deletion."));
-        }
-        String password = body.get("password");
+        String password = request.getPassword();
         if (password == null || password.isBlank()) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "Password is required to confirm account deletion."));

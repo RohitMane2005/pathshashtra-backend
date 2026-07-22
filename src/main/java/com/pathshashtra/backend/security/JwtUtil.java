@@ -42,7 +42,10 @@ public class JwtUtil {
     @Value("${app.cookie.secure:true}")
     private boolean cookieSecure;
 
-    @Value("${app.cookie.same-site:None}")
+    // CRIT-03 FIX: Default must match SecurityConfig (line 39) — both default to Lax.
+    // Previously this defaulted to "None" while SecurityConfig defaulted to "Lax",
+    // creating a CSRF window when COOKIE_SAME_SITE env var was not set.
+    @Value("${app.cookie.same-site:Lax}")
     private String cookieSameSite;
 
     @Value("${app.cookie.domain:}")

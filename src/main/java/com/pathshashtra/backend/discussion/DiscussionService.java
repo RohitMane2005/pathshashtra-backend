@@ -71,7 +71,8 @@ public class DiscussionService {
         post.setAuthorName(user.getName());
         post.setTitle(htmlSanitizer.sanitize(title.trim(), 200));
         post.setContent(htmlSanitizer.sanitize(content.trim(), 10000));
-        post.setTags(tags != null ? tags.trim().toLowerCase() : "");
+        // HIGH-03 FIX: Tags were the only user input not sanitized — XSS vector.
+        post.setTags(htmlSanitizer.sanitize(tags != null ? tags.trim().toLowerCase() : "", 200));
         post.setCreatedAt(LocalDateTime.now());
         post.setUpdatedAt(LocalDateTime.now());
         return postRepo.save(post);

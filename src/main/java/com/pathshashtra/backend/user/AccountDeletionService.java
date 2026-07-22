@@ -23,6 +23,7 @@ import com.pathshashtra.backend.study.StudyPlanRepository;
 import com.pathshashtra.backend.study.StudyTopicRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,7 @@ public class AccountDeletionService {
 
     private final UserRepository userRepository;
     private final UserQueryService userQueryService;
+    private final StringRedisTemplate redisTemplate;
     private final PasswordEncoder passwordEncoder;
 
     // Domain repositories for cascading deletes
@@ -66,6 +68,7 @@ public class AccountDeletionService {
 
     public AccountDeletionService(
             UserRepository userRepository,
+            StringRedisTemplate redisTemplate,
             UserQueryService userQueryService,
             PasswordEncoder passwordEncoder,
             UserProfileRepository profileRepository,
@@ -91,6 +94,7 @@ public class AccountDeletionService {
             WeeklyReportRepository weeklyReportRepository) {
         this.userRepository = userRepository;
         this.userQueryService = userQueryService;
+        this.redisTemplate = redisTemplate;
         this.passwordEncoder = passwordEncoder;
         this.profileRepository = profileRepository;
         this.codingProblemRepository = codingProblemRepository;
@@ -160,6 +164,15 @@ public class AccountDeletionService {
 
         userRepository.delete(user);
 
-        log.info("[AUDIT] Account permanently deleted for userId={}", userId);
+        // HIGH-01 FIX: Invalidate all active JWTs for this user.
+        // Uses the same pwd_changed: pattern checked by JwtAuthenticationFilter.
+        // Any JWT issued before this timestamp will be rejected, preventing
+        // deleted users from making API calls with still-valid cookies.
+        String pwdChangeKey = "pwd_changed:" + email;
+        redisTemplate.opsForValue().set(pwdChangeKey,
+                String.valueOf(System.currentTimeMillis()),
+                86400, java.util.concurrent.TimeUnit.SECONDS);
+
+        log.info("[AUDIT] Account permanently deleted for userId={}, all tokens invalidated", userId);
     }
 }

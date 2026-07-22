@@ -58,20 +58,24 @@ public class AuthController {
         String email = request.getEmail().trim().toLowerCase();
         request.setEmail(email);
 
-        if (authService.emailExists(email)) {
+        // HIGH-09 FIX: Don't explicitly check emailExists() — that returns a distinct
+        // 409 response that lets attackers enumerate valid accounts.
+        // Instead, try to register and catch the DB unique constraint violation.
+        try {
+            AuthResponse authResponse = authService.register(request);
+            log.info("New user registered from ip={}", ip);
+
+            String token = authService.generateToken(request.getEmail(), "STUDENT");
+            ResponseCookie cookie = jwtUtil.buildCookie(token);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .body(authResponse);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // Email already exists — return same generic error as other failures
+            // to prevent user enumeration. Frontend handles this gracefully.
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", "Email already registered. Please sign in."));
+                    .body(Map.of("error", "Registration failed. This email may already be registered — try signing in."));
         }
-
-        AuthResponse authResponse = authService.register(request);
-        log.info("New user registered from ip={}", ip);
-
-        // Generate token and set ONLY as HttpOnly cookie — never in body
-        String token = authService.generateToken(request.getEmail(), "STUDENT");
-        ResponseCookie cookie = jwtUtil.buildCookie(token);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(authResponse);
     }
 
     /**
@@ -93,9 +97,9 @@ public class AuthController {
                     .body(Map.of("error", "Too many login attempts. Please wait a few minutes."));
         }
 
-        AuthResponse authResponse = authService.login(request);
+        AuthService.LoginResult loginResult = authService.login(request);
 
-        if (authResponse == null) {
+        if (loginResult == null) {
             log.warn("Failed login for email={} ip={}", email, ip);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "Invalid email or password"));
@@ -103,12 +107,13 @@ public class AuthController {
 
         log.info("Successful login for email={} ip={}", email, ip);
 
-        // AUDIT FIX: Token is set ONLY as HttpOnly cookie — never in response body
-        String token = authService.generateToken(email, "STUDENT");
+        // CRIT-02 FIX: Use actual user role from DB instead of hardcoded "STUDENT".
+        // Previously all users (including admins) got STUDENT role in their JWT.
+        String token = authService.generateToken(email, loginResult.role());
         ResponseCookie cookie = jwtUtil.buildCookie(token);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(authResponse);
+                .body(new AuthResponse(loginResult.message()));
     }
 
     /**
@@ -145,7 +150,15 @@ public class AuthController {
      * The code is consumed (single-use, 30s TTL in Redis).
      */
     @PostMapping("/exchange-code")
-    public ResponseEntity<?> exchangeOAuthCode(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> exchangeOAuthCode(@RequestBody Map<String, String> body,
+                                                HttpServletRequest request) {
+        // MED-07 FIX: Rate limit exchange-code — defense-in-depth for auth endpoints
+        String ip = getClientIp(request);
+        if (!rateLimiter.isAllowed("exchange:" + ip, 10, 60)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "Too many requests. Please try again later."));
+        }
+
         String code = body.get("code");
         if (code == null || code.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "code is required"));

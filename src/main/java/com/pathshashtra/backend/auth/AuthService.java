@@ -53,11 +53,15 @@ public class AuthService {
     }
 
     /**
-     * Login — FIX BUG 1: OAuth provider and soft-delete checks happen BEFORE
+     * CRIT-02 FIX: Returns LoginResult (includes user's actual role from DB)
+     * instead of AuthResponse (message-only). The controller uses the role to
+     * generate a JWT with the correct authority — previously it hardcoded STUDENT.
+     *
+     * FIX BUG 1: OAuth provider and soft-delete checks happen BEFORE
      * password comparison. All failure paths return null (same generic response)
      * to prevent user enumeration via timing or error message differences.
      */
-    public AuthResponse login(LoginRequest request) {
+    public LoginResult login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElse(null);
 
@@ -82,6 +86,12 @@ public class AuthService {
             return null;
         }
 
-        return new AuthResponse("Login successful");
+        return new LoginResult("Login successful", user.getRole());
     }
+
+    /**
+     * CRIT-02 FIX: Immutable result carrying message + user's actual DB role.
+     * The controller reads role() to generate a JWT with the correct authority.
+     */
+    public record LoginResult(String message, String role) {}
 }

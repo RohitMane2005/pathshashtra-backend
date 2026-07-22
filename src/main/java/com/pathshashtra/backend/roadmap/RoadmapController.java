@@ -42,7 +42,9 @@ public class RoadmapController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             Authentication auth) {
-        size = Math.min(size, 20);
+        // MED-09 FIX: Clamp to valid ranges — negative values cause Spring Data exceptions
+        page = Math.max(0, page);
+        size = Math.max(1, Math.min(size, 20));
         return ResponseEntity.ok(roadmapService.getUserRoadmaps(auth.getName(), PageRequest.of(page, size)));
     }
 
