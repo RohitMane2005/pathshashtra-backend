@@ -122,6 +122,7 @@ public class SecurityConfig {
                     new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                    .requestMatchers("/error").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
