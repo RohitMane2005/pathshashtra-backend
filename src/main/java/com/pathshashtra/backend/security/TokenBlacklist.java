@@ -1,5 +1,7 @@
 package com.pathshashtra.backend.security;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +17,8 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class TokenBlacklist {
 
+    private static final Logger log = LoggerFactory.getLogger(TokenBlacklist.class);
+
     private final StringRedisTemplate redisTemplate;
 
     public TokenBlacklist(StringRedisTemplate redisTemplate) {
@@ -29,7 +33,11 @@ public class TokenBlacklist {
      */
     public void blacklist(String jti, long ttlSeconds) {
         if (jti == null || ttlSeconds <= 0) return;
-        redisTemplate.opsForValue().set("blacklist:" + jti, "1", ttlSeconds, TimeUnit.SECONDS);
+        try {
+            redisTemplate.opsForValue().set("blacklist:" + jti, "1", ttlSeconds, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("Redis error during token blacklist operation: {}", e.getMessage());
+        }
     }
 
     /**
@@ -37,6 +45,11 @@ public class TokenBlacklist {
      */
     public boolean isBlacklisted(String jti) {
         if (jti == null) return false;
-        return Boolean.TRUE.equals(redisTemplate.hasKey("blacklist:" + jti));
+        try {
+            return Boolean.TRUE.equals(redisTemplate.hasKey("blacklist:" + jti));
+        } catch (Exception e) {
+            log.warn("Redis error during token blacklist check: {}", e.getMessage());
+            return false;
+        }
     }
 }

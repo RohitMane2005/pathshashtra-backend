@@ -1,5 +1,7 @@
 package com.pathshashtra.backend.ratelimit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
@@ -21,6 +23,8 @@ import java.util.UUID;
  */
 @Component
 public class RedisRateLimiter {
+
+    private static final Logger log = LoggerFactory.getLogger(RedisRateLimiter.class);
 
     private final StringRedisTemplate redisTemplate;
 
@@ -55,19 +59,24 @@ public class RedisRateLimiter {
      * @return true if the request is allowed
      */
     public boolean isAllowed(String key, int limit, long windowSeconds) {
-        long nowMs = Instant.now().toEpochMilli();
-        long windowMs = windowSeconds * 1000L;
-        String uniqueMember = UUID.randomUUID().toString();
+        try {
+            long nowMs = Instant.now().toEpochMilli();
+            long windowMs = windowSeconds * 1000L;
+            String uniqueMember = UUID.randomUUID().toString();
 
-        Long result = redisTemplate.execute(
-            SLIDING_WINDOW,
-            Collections.singletonList("rl:" + key),
-            String.valueOf(nowMs),
-            String.valueOf(windowMs),
-            String.valueOf(limit),
-            uniqueMember
-        );
-        return Long.valueOf(1L).equals(result);
+            Long result = redisTemplate.execute(
+                SLIDING_WINDOW,
+                Collections.singletonList("rl:" + key),
+                String.valueOf(nowMs),
+                String.valueOf(windowMs),
+                String.valueOf(limit),
+                uniqueMember
+            );
+            return Long.valueOf(1L).equals(result);
+        } catch (Exception e) {
+            log.warn("Redis unavailable during rate limit check: {}. Failing open.", e.getMessage());
+            return true;
+        }
     }
 
     /**

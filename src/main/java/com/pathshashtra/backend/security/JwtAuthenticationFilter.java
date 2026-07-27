@@ -76,7 +76,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // PasswordResetService stores the change timestamp in Redis.
                 long tokenIssuedAt = jwtUtil.extractIssuedAt(token);
                 String pwdChangeKey = "pwd_changed:" + email;
-                String pwdChangeTs = redisTemplate.opsForValue().get(pwdChangeKey);
+                String pwdChangeTs = null;
+                try {
+                    pwdChangeTs = redisTemplate.opsForValue().get(pwdChangeKey);
+                } catch (Exception e) {
+                    log.warn("Redis error fetching pwd_changed timestamp: {}", e.getMessage());
+                }
                 if (pwdChangeTs != null && tokenIssuedAt < Long.parseLong(pwdChangeTs)) {
                     sendUnauthorized(response, "Password was changed. Please log in again.");
                     return;
