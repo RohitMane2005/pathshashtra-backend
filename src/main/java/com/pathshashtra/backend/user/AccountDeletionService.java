@@ -168,10 +168,14 @@ public class AccountDeletionService {
         // Uses the same pwd_changed: pattern checked by JwtAuthenticationFilter.
         // Any JWT issued before this timestamp will be rejected, preventing
         // deleted users from making API calls with still-valid cookies.
-        String pwdChangeKey = "pwd_changed:" + email;
-        redisTemplate.opsForValue().set(pwdChangeKey,
-                String.valueOf(System.currentTimeMillis()),
-                86400, java.util.concurrent.TimeUnit.SECONDS);
+        try {
+            String pwdChangeKey = "pwd_changed:" + email;
+            redisTemplate.opsForValue().set(pwdChangeKey,
+                    String.valueOf(System.currentTimeMillis()),
+                    86400, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("Redis unavailable during account deletion session invalidation: {}", e.getMessage());
+        }
 
         log.info("[AUDIT] Account permanently deleted for userId={}, all tokens invalidated", userId);
     }

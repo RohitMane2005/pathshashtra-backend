@@ -29,7 +29,7 @@ class TokenBlacklistTest {
 
     @BeforeEach
     void setUp() {
-        when(redisTracker.isAvailable()).thenReturn(true);
+        lenient().when(redisTracker.isAvailable()).thenReturn(true);
         tokenBlacklist = new TokenBlacklist(redisTemplate, redisTracker);
     }
 

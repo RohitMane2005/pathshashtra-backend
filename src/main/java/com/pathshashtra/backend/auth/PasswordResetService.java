@@ -131,10 +131,14 @@ public class PasswordResetService {
         // HIGH-04 FIX: Invalidate all existing sessions by recording password-change timestamp.
         // Any JWT issued before this timestamp will be rejected by JwtAuthenticationFilter.
         // Key uses email to match JwtAuthenticationFilter's lookup (JWT subject = email).
-        String pwdChangeKey = "pwd_changed:" + user.getEmail();
-        redisTemplate.opsForValue().set(pwdChangeKey,
-                String.valueOf(System.currentTimeMillis()),
-                86400, java.util.concurrent.TimeUnit.SECONDS); // 24h = max JWT lifetime
+        try {
+            String pwdChangeKey = "pwd_changed:" + user.getEmail();
+            redisTemplate.opsForValue().set(pwdChangeKey,
+                    String.valueOf(System.currentTimeMillis()),
+                    86400, java.util.concurrent.TimeUnit.SECONDS); // 24h = max JWT lifetime
+        } catch (Exception e) {
+            log.warn("Redis unavailable during password reset session invalidation: {}", e.getMessage());
+        }
 
         log.info("[AUDIT] Password successfully reset for userId={}, all prior tokens invalidated", user.getId());
     }

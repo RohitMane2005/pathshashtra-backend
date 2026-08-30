@@ -48,6 +48,12 @@ public class AuthService {
         return jwtUtil.generateToken(email, role);
     }
 
+    /** Checks if a user exists with the given email. */
+    public boolean emailExists(String email) {
+        if (email == null) return false;
+        return userRepository.findByEmail(email.trim().toLowerCase()).isPresent();
+    }
+
     /**
      * CRIT-02 FIX: Returns LoginResult (includes user's actual role from DB)
      * instead of AuthResponse (message-only). The controller uses the role to
