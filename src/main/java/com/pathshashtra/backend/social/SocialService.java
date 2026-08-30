@@ -1,5 +1,7 @@
 package com.pathshashtra.backend.social;
 
+import com.pathshashtra.backend.common.XpCalculator;
+
 import com.pathshashtra.backend.coding.CodingProblemRepository;
 import com.pathshashtra.backend.notification.NotificationService;
 import com.pathshashtra.backend.quiz.QuizRepository;
@@ -97,7 +99,7 @@ public class SocialService {
         long problems = codingRepo.countSolvedByUserId(userId);
         long topics = topicRepo.countCompletedByUserId(userId);
         long quizzes = quizRepo.countByUserId(userId);
-        long xp = problems * 50 + topics * 30 + quizzes * 100;
+        long xp = XpCalculator.calculate(problems, topics, quizzes);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("userId", target.getId());
@@ -106,7 +108,7 @@ public class SocialService {
         result.put("topics", topics);
         result.put("quizzes", quizzes);
         result.put("xp", xp);
-        result.put("level", xp / 500 + 1);
+        result.put("level", XpCalculator.levelFromXp(xp));
         result.put("followers", followRepo.countByFollowingId(userId));
         result.put("following", followRepo.countByFollowerId(userId));
         result.put("isFollowing", followRepo.existsByFollowerIdAndFollowingId(me.getId(), userId));

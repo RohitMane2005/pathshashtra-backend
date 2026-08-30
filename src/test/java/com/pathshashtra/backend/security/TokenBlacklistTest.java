@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.security;
 
+import com.pathshashtra.backend.config.RedisAvailabilityTracker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,12 +23,14 @@ class TokenBlacklistTest {
 
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ValueOperations<String, String> valueOps;
+    @Mock private RedisAvailabilityTracker redisTracker;
 
     private TokenBlacklist tokenBlacklist;
 
     @BeforeEach
     void setUp() {
-        tokenBlacklist = new TokenBlacklist(redisTemplate);
+        when(redisTracker.isAvailable()).thenReturn(true);
+        tokenBlacklist = new TokenBlacklist(redisTemplate, redisTracker);
     }
 
     @Test

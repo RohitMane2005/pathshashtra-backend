@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.ratelimit;
 
+import com.pathshashtra.backend.config.RedisAvailabilityTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -27,6 +28,7 @@ public class RedisRateLimiter {
     private static final Logger log = LoggerFactory.getLogger(RedisRateLimiter.class);
 
     private final StringRedisTemplate redisTemplate;
+    private final RedisAvailabilityTracker redisTracker;
 
     // Atomic sliding-window Lua script
     private static final RedisScript<Long> SLIDING_WINDOW = RedisScript.of(
@@ -48,8 +50,9 @@ public class RedisRateLimiter {
         Long.class
     );
 
-    public RedisRateLimiter(StringRedisTemplate redisTemplate) {
+    public RedisRateLimiter(StringRedisTemplate redisTemplate, RedisAvailabilityTracker redisTracker) {
         this.redisTemplate = redisTemplate;
+        this.redisTracker = redisTracker;
     }
 
     /**
@@ -59,6 +62,7 @@ public class RedisRateLimiter {
      * @return true if the request is allowed
      */
     public boolean isAllowed(String key, int limit, long windowSeconds) {
+        if (!redisTracker.isAvailable()) return true; // fail open when Redis is down
         try {
             long nowMs = Instant.now().toEpochMilli();
             long windowMs = windowSeconds * 1000L;
@@ -74,6 +78,7 @@ public class RedisRateLimiter {
             );
             return Long.valueOf(1L).equals(result);
         } catch (Exception e) {
+            redisTracker.markUnavailable();
             log.warn("Redis unavailable during rate limit check: {}. Failing open.", e.getMessage());
             return true;
         }
@@ -83,12 +88,15 @@ public class RedisRateLimiter {
      * Count remaining requests in the current window (for X-RateLimit-Remaining header).
      */
     public long remaining(String prefix, String identifier, int limit) {
+        if (!redisTracker.isAvailable()) return limit;
         String key = "rl:" + prefix + identifier;
         long count = 0;
         try {
             Long card = redisTemplate.opsForZSet().zCard(key);
             count = card != null ? card : 0;
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            redisTracker.markUnavailable();
+        }
         return Math.max(0, limit - count);
     }
 }

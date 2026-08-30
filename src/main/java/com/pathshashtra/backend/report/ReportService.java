@@ -1,5 +1,7 @@
 package com.pathshashtra.backend.report;
 
+import com.pathshashtra.backend.common.XpCalculator;
+
 import com.pathshashtra.backend.coding.CodingProblemRepository;
 import com.pathshashtra.backend.quiz.QuizRepository;
 import com.pathshashtra.backend.exception.ForbiddenException;
@@ -69,10 +71,10 @@ public class ReportService {
         stats.put("topicsCompleted", topics);
         stats.put("quizzesCompleted", quizzes);
 
-        // XP scoring: 10xp per problem, 5xp per topic, 15xp per quiz
-        long xp = (problems * 10) + (topics * 5) + (quizzes * 15);
+        // CRIT-01 FIX: Use canonical XP formula from XpCalculator
+        long xp = XpCalculator.calculate(problems, topics, quizzes);
         stats.put("xpTotal", xp);
-        stats.put("level", xp / 500 + 1);
+        stats.put("level", XpCalculator.levelFromXp(xp));
 
         // Get previous week for comparison
         List<WeeklyReport> reports = reportRepo.findByUserIdOrderByWeekStartDesc(user.getId());

@@ -8,7 +8,6 @@ import com.pathshashtra.backend.social.FollowRepository;
 import com.pathshashtra.backend.study.StudyTopicRepository;
 import com.pathshashtra.backend.user.User;
 import com.pathshashtra.backend.user.UserRepository;
-import com.pathshashtra.backend.user.UserService;
 import com.pathshashtra.backend.notes.NoteRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

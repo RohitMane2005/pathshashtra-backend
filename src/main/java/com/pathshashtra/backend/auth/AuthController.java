@@ -28,15 +28,18 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final TokenBlacklist tokenBlacklist;
     private final OAuthCodeService oAuthCodeService;
+    private final com.pathshashtra.backend.user.UserRepository userRepository;
 
     public AuthController(AuthService authService, RateLimiter rateLimiter,
                           JwtUtil jwtUtil, TokenBlacklist tokenBlacklist,
-                          OAuthCodeService oAuthCodeService) {
+                          OAuthCodeService oAuthCodeService,
+                          com.pathshashtra.backend.user.UserRepository userRepository) {
         this.authService = authService;
         this.rateLimiter = rateLimiter;
         this.jwtUtil = jwtUtil;
         this.tokenBlacklist = tokenBlacklist;
         this.oAuthCodeService = oAuthCodeService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -170,7 +173,13 @@ public class AuthController {
                     .body(Map.of("error", "Invalid or expired OAuth code. Please try logging in again."));
         }
 
-        String token = jwtUtil.generateToken(email);
+        // HIGH-05 FIX: Look up user's actual role from DB instead of defaulting to STUDENT.
+        // Previously used jwtUtil.generateToken(email) which hardcodes STUDENT role,
+        // meaning admin users logging in via OAuth lost their admin privileges.
+        String role = userRepository.findByEmail(email)
+                .map(com.pathshashtra.backend.user.User::getRole)
+                .orElse("STUDENT");
+        String token = jwtUtil.generateToken(email, role);
         ResponseCookie cookie = jwtUtil.buildCookie(token);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())

@@ -153,11 +153,11 @@
 			<version>0.1.5</version>
 		</dependency>
 
-		<!-- H2 for unit/integration tests (in-memory, no external DB needed) -->
+		<!-- H2 database (local development only — runtime-scoped to exclude from test classpath) -->
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
-			<scope>test</scope>
+			<scope>runtime</scope>
 		</dependency>
 
 		<!-- Spring Security test utilities (for @WithMockUser etc.) -->

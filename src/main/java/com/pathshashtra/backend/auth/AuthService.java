@@ -31,10 +31,6 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    public boolean emailExists(String email) {
-        return userRepository.findByEmail(email).isPresent();
-    }
-
     /** Register from DTO -- no mass-assignment risk. Returns message (JWT goes in cookie only). */
     public AuthResponse register(RegisterRequest request) {
         User user = new User();

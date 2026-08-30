@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.config;
 
+import com.pathshashtra.backend.config.RedisAvailabilityTracker;
 import com.pathshashtra.backend.ratelimit.GlobalRateLimitFilter;
 import com.pathshashtra.backend.security.JwtAuthenticationFilter;
 import com.pathshashtra.backend.security.JwtUtil;
@@ -35,6 +36,7 @@ public class SecurityConfig {
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
     private final OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
     private final StringRedisTemplate redisTemplate;
+    private final RedisAvailabilityTracker redisTracker;
 
     @Value("${app.cookie.same-site:Lax}")
     private String cookieSameSite;
@@ -43,7 +45,8 @@ public class SecurityConfig {
                           GlobalRateLimitFilter globalRateLimitFilter,
                           OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler,
                           OAuth2LoginFailureHandler oAuth2LoginFailureHandler,
-                          StringRedisTemplate redisTemplate) {
+                          StringRedisTemplate redisTemplate,
+                          RedisAvailabilityTracker redisTracker) {
         this.jwtUtil = jwtUtil;
         this.tokenBlacklist = tokenBlacklist;
         this.objectMapper = objectMapper;
@@ -51,6 +54,7 @@ public class SecurityConfig {
         this.oAuth2LoginSuccessHandler = oAuth2LoginSuccessHandler;
         this.oAuth2LoginFailureHandler = oAuth2LoginFailureHandler;
         this.redisTemplate = redisTemplate;
+        this.redisTracker = redisTracker;
     }
 
     @Bean
@@ -60,7 +64,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtil, tokenBlacklist, objectMapper, redisTemplate);
+        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtil, tokenBlacklist, objectMapper, redisTemplate, redisTracker);
         http
             .cors(cors -> {})
             /**

@@ -1,6 +1,7 @@
 package com.pathshashtra.backend.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pathshashtra.backend.config.RedisAvailabilityTracker;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,15 +38,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final TokenBlacklist tokenBlacklist;
     private final ObjectMapper objectMapper;
     private final StringRedisTemplate redisTemplate;
+    private final RedisAvailabilityTracker redisTracker;
 
     public JwtAuthenticationFilter(JwtUtil jwtUtil,
                                    TokenBlacklist tokenBlacklist,
                                    ObjectMapper objectMapper,
-                                   StringRedisTemplate redisTemplate) {
+                                   StringRedisTemplate redisTemplate,
+                                   RedisAvailabilityTracker redisTracker) {
         this.jwtUtil = jwtUtil;
         this.tokenBlacklist = tokenBlacklist;
         this.objectMapper = objectMapper;
         this.redisTemplate = redisTemplate;
+        this.redisTracker = redisTracker;
     }
 
     @Override
@@ -77,10 +81,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 long tokenIssuedAt = jwtUtil.extractIssuedAt(token);
                 String pwdChangeKey = "pwd_changed:" + email;
                 String pwdChangeTs = null;
-                try {
-                    pwdChangeTs = redisTemplate.opsForValue().get(pwdChangeKey);
-                } catch (Exception e) {
-                    log.warn("Redis error fetching pwd_changed timestamp: {}", e.getMessage());
+                if (redisTracker.isAvailable()) {
+                    try {
+                        pwdChangeTs = redisTemplate.opsForValue().get(pwdChangeKey);
+                    } catch (Exception e) {
+                        redisTracker.markUnavailable();
+                        log.warn("Redis error fetching pwd_changed timestamp: {}", e.getMessage());
+                    }
                 }
                 if (pwdChangeTs != null && tokenIssuedAt < Long.parseLong(pwdChangeTs)) {
                     sendUnauthorized(response, "Password was changed. Please log in again.");
@@ -129,4 +136,3 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         objectMapper.writeValue(response.getWriter(), Map.of("error", message));
     }
 }
-

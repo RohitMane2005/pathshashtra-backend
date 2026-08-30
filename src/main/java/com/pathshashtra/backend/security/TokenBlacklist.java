@@ -1,5 +1,6 @@
 package com.pathshashtra.backend.security;
 
+import com.pathshashtra.backend.config.RedisAvailabilityTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -20,9 +21,11 @@ public class TokenBlacklist {
     private static final Logger log = LoggerFactory.getLogger(TokenBlacklist.class);
 
     private final StringRedisTemplate redisTemplate;
+    private final RedisAvailabilityTracker redisTracker;
 
-    public TokenBlacklist(StringRedisTemplate redisTemplate) {
+    public TokenBlacklist(StringRedisTemplate redisTemplate, RedisAvailabilityTracker redisTracker) {
         this.redisTemplate = redisTemplate;
+        this.redisTracker = redisTracker;
     }
 
     /**
@@ -33,9 +36,11 @@ public class TokenBlacklist {
      */
     public void blacklist(String jti, long ttlSeconds) {
         if (jti == null || ttlSeconds <= 0) return;
+        if (!redisTracker.isAvailable()) return;
         try {
             redisTemplate.opsForValue().set("blacklist:" + jti, "1", ttlSeconds, TimeUnit.SECONDS);
         } catch (Exception e) {
+            redisTracker.markUnavailable();
             log.warn("Redis error during token blacklist operation: {}", e.getMessage());
         }
     }
@@ -45,9 +50,11 @@ public class TokenBlacklist {
      */
     public boolean isBlacklisted(String jti) {
         if (jti == null) return false;
+        if (!redisTracker.isAvailable()) return false;
         try {
             return Boolean.TRUE.equals(redisTemplate.hasKey("blacklist:" + jti));
         } catch (Exception e) {
+            redisTracker.markUnavailable();
             log.warn("Redis error during token blacklist check: {}", e.getMessage());
             return false;
         }

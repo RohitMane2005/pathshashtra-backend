@@ -4,12 +4,16 @@ import com.pathshashtra.backend.common.GroqClient;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+/**
+ * MED-03 FIX: Renamed from ClaudeApiService — this class uses Groq/Llama, not Claude.
+ * Name now matches the project pattern: CareerAIService, CodingAIService, StudyPlanAIService.
+ */
 @Service
-public class ClaudeApiService {
+public class QuizAIService {
 
     private final GroqClient groqClient;
 
-    public ClaudeApiService(GroqClient groqClient) {
+    public QuizAIService(GroqClient groqClient) {
         this.groqClient = groqClient;
     }
 

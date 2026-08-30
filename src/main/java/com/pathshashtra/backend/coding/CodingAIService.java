@@ -4,12 +4,16 @@ import com.pathshashtra.backend.common.GroqClient;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+/**
+ * MED-04 FIX: Renamed from GrokCodingService — uses Groq API, not xAI's Grok.
+ * Name now matches the project pattern: QuizAIService, CareerAIService, StudyPlanAIService.
+ */
 @Service
-public class GrokCodingService {
+public class CodingAIService {
 
   private final GroqClient groqClient;
 
-  public GrokCodingService(GroqClient groqClient) {
+  public CodingAIService(GroqClient groqClient) {
     this.groqClient = groqClient;
   }
 

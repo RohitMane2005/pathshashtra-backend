@@ -1,5 +1,8 @@
 package com.pathshashtra.backend.security;
 
+import com.pathshashtra.backend.config.RedisAvailabilityTracker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -20,13 +23,16 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class OAuthCodeService {
 
+    private static final Logger log = LoggerFactory.getLogger(OAuthCodeService.class);
     private static final long CODE_TTL_SECONDS = 30L;
     private static final String PREFIX = "oauth_code:";
 
     private final StringRedisTemplate redisTemplate;
+    private final RedisAvailabilityTracker redisTracker;
 
-    public OAuthCodeService(StringRedisTemplate redisTemplate) {
+    public OAuthCodeService(StringRedisTemplate redisTemplate, RedisAvailabilityTracker redisTracker) {
         this.redisTemplate = redisTemplate;
+        this.redisTracker = redisTracker;
     }
 
     /**
@@ -35,7 +41,17 @@ public class OAuthCodeService {
      */
     public String generateCode(String email) {
         String code = UUID.randomUUID().toString();
-        redisTemplate.opsForValue().set(PREFIX + code, email, CODE_TTL_SECONDS, TimeUnit.SECONDS);
+        if (!redisTracker.isAvailable()) {
+            log.warn("Redis unavailable — OAuth code exchange will not work. "
+                    + "OAuth login requires Redis for secure code exchange.");
+            return code;
+        }
+        try {
+            redisTemplate.opsForValue().set(PREFIX + code, email, CODE_TTL_SECONDS, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            redisTracker.markUnavailable();
+            log.warn("Redis error storing OAuth code: {}", e.getMessage());
+        }
         return code;
     }
 
@@ -49,8 +65,18 @@ public class OAuthCodeService {
      */
     public String exchangeCode(String code) {
         if (code == null || code.isBlank()) return null;
-        String key = PREFIX + code;
-        // Atomic: returns value and deletes key in one Redis command
-        return redisTemplate.opsForValue().getAndDelete(key);
+        if (!redisTracker.isAvailable()) {
+            log.warn("Redis unavailable — cannot exchange OAuth code");
+            return null;
+        }
+        try {
+            String key = PREFIX + code;
+            // Atomic: returns value and deletes key in one Redis command
+            return redisTemplate.opsForValue().getAndDelete(key);
+        } catch (Exception e) {
+            redisTracker.markUnavailable();
+            log.warn("Redis error exchanging OAuth code: {}", e.getMessage());
+            return null;
+        }
     }
 }

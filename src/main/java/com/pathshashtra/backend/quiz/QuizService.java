@@ -32,20 +32,20 @@ public class QuizService {
     private final QuizRepository quizRepository;
     private final UserRepository userRepository;
     private final UserProfileRepository profileRepository;
-    private final ClaudeApiService claudeApiService;
+    private final QuizAIService quizAIService;
     private final JsonCleaner jsonCleaner;
     private final ObjectMapper objectMapper;
 
     public QuizService(QuizRepository quizRepository,
                        UserRepository userRepository,
                        UserProfileRepository profileRepository,
-                       ClaudeApiService claudeApiService,
+                       QuizAIService quizAIService,
                        JsonCleaner jsonCleaner,
                        ObjectMapper objectMapper) {
         this.quizRepository = quizRepository;
         this.userRepository = userRepository;
         this.profileRepository = profileRepository;
-        this.claudeApiService = claudeApiService;
+        this.quizAIService = quizAIService;
         this.jsonCleaner = jsonCleaner;
         this.objectMapper = objectMapper;
     }
@@ -54,7 +54,7 @@ public class QuizService {
     public QuizStartResponse startQuiz(String email) {
         User user = getUser(email);
         String profileContext = buildProfileContext(user);
-        String questionsJson = claudeApiService.generateQuizQuestions(profileContext);
+        String questionsJson = quizAIService.generateQuizQuestions(profileContext);
 
         QuizSession session = new QuizSession();
         session.setUser(user);
@@ -141,7 +141,7 @@ public class QuizService {
         }
 
         String profileContext = buildProfileContext(user);
-        String resultJson = claudeApiService.analyzeQuizAnswers(
+        String resultJson = quizAIService.analyzeQuizAnswers(
                 profileContext, session.getQuestionsJson(), session.getAnswersJson());
 
         session.setResultJson(resultJson);

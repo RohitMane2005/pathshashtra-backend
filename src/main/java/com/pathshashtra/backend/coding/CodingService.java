@@ -14,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Propagation;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -28,20 +27,20 @@ public class CodingService {
     private final CodingProblemRepository problemRepository;
     private final UserRepository userRepository;
     private final UserProfileRepository profileRepository;
-    private final GrokCodingService grokCodingService;
+    private final CodingAIService codingAIService;
     private final JsonCleaner jsonCleaner;
     private final ObjectMapper objectMapper;
 
     public CodingService(CodingProblemRepository problemRepository,
                          UserRepository userRepository,
                          UserProfileRepository profileRepository,
-                         GrokCodingService grokCodingService,
+                         CodingAIService codingAIService,
                          JsonCleaner jsonCleaner,
                          ObjectMapper objectMapper) {
         this.problemRepository = problemRepository;
         this.userRepository = userRepository;
         this.profileRepository = profileRepository;
-        this.grokCodingService = grokCodingService;
+        this.codingAIService = codingAIService;
         this.jsonCleaner = jsonCleaner;
         this.objectMapper = objectMapper;
     }
@@ -49,7 +48,7 @@ public class CodingService {
     @Transactional
     public Map<String, Object> generateProblem(String email, ProblemGenerateRequest request) {
         User user = getUser(email);
-        String problemJson = grokCodingService.generateProblem(
+        String problemJson = codingAIService.generateProblem(
                 request.getTopic(), request.getDifficulty(), request.getLanguage());
         String cleaned = jsonCleaner.clean(problemJson);
         String title = extractField(cleaned, "title", "DSA Problem");
@@ -81,7 +80,7 @@ public class CodingService {
             throw new BadRequestException("Maximum 3 hints allowed per problem");
         }
 
-        String hintJson = grokCodingService.generateHint(
+        String hintJson = codingAIService.generateHint(
                 problem.getProblemJson(),
                 request.getCurrentCode() != null ? request.getCurrentCode() : "",
                 problem.getHintsUsed()
@@ -107,7 +106,7 @@ public class CodingService {
                 .findByIdAndUserId(request.getProblemId(), user.getId())
                 .orElseThrow(() -> new NotFoundException("Problem not found"));
 
-        String feedbackJson = grokCodingService.reviewCode(
+        String feedbackJson = codingAIService.reviewCode(
                 problem.getProblemJson(), request.getCode(), request.getLanguage());
 
         problem.setSubmittedCode(request.getCode());
@@ -133,24 +132,27 @@ public class CodingService {
      * causing HTTP 500 on GET /coding/problems. Plain List serializes cleanly.
      * The controller wraps it in a Map with "content" and "totalElements" keys
      * to preserve the same response shape the frontend expects.
+     *
+     * PERF M3: Uses projection query to avoid loading heavy TEXT columns
+     * (problemJson, submittedCode, feedbackJson — potentially 10-50 KB each).
      */
     @Transactional(readOnly = true)
     public Map<String, Object> getMyProblems(String email, Pageable pageable) {
         User user = getUser(email);
-        Page<CodingProblem> page = problemRepository
-                .findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
+        Page<Object[]> page = problemRepository
+                .findProblemSummariesByUserId(user.getId(), pageable);
 
         List<Map<String, Object>> result = new ArrayList<>();
-        for (CodingProblem p : page.getContent()) {
+        for (Object[] row : page.getContent()) {
             Map<String, Object> item = new HashMap<>();
-            item.put("id", p.getId());
-            item.put("title", p.getProblemTitle());
-            item.put("topic", p.getTopic());
-            item.put("difficulty", p.getDifficulty());
-            item.put("language", p.getLanguage());
-            item.put("status", p.getStatus().name()); // serialize enum as String explicitly
-            item.put("hintsUsed", p.getHintsUsed());
-            item.put("createdAt", p.getCreatedAt() != null ? p.getCreatedAt().toString() : null);
+            item.put("id", row[0]);
+            item.put("title", row[1]);
+            item.put("topic", row[2]);
+            item.put("difficulty", row[3]);
+            item.put("language", row[4]);
+            item.put("status", row[5] != null ? row[5].toString() : null); // enum → String
+            item.put("hintsUsed", row[6]);
+            item.put("createdAt", row[7] != null ? row[7].toString() : null);
             result.add(item);
         }
 
@@ -218,7 +220,7 @@ public class CodingService {
             if (p.getExperienceLevel() != null) level[0] = p.getExperienceLevel();
         });
 
-        String roadmapJson = grokCodingService.generateRoadmap(user.getName(), level[0], targetGoal);
+        String roadmapJson = codingAIService.generateRoadmap(user.getName(), level[0], targetGoal);
         Map<String, Object> response = new HashMap<>();
         response.put("roadmap", parseJson(jsonCleaner.clean(roadmapJson)));
         return response;

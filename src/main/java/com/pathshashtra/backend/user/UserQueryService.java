@@ -1,5 +1,7 @@
 package com.pathshashtra.backend.user;
 
+import com.pathshashtra.backend.common.XpCalculator;
+
 import com.pathshashtra.backend.coding.CodingProblemRepository;
 import com.pathshashtra.backend.exception.NotFoundException;
 import com.pathshashtra.backend.quiz.QuizRepository;
@@ -101,7 +103,7 @@ public class UserQueryService {
             long problems = problemMap.getOrDefault(user.getId(), 0L);
             long topics = topicMap.getOrDefault(user.getId(), 0L);
             long quizzes = quizMap.getOrDefault(user.getId(), 0L);
-            long xp = problems * 50 + topics * 30 + quizzes * 100;
+            long xp = XpCalculator.calculate(problems, topics, quizzes);
 
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("name", user.getName());

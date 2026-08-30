@@ -25,4 +25,17 @@ public interface CodingProblemRepository extends JpaRepository<CodingProblem, Lo
            "AND p.createdAt BETWEEN :start AND :end")
     long countByUserIdAndStatusAndCreatedAtBetween(Long userId, String status,
                                                     java.time.LocalDateTime start, java.time.LocalDateTime end);
+
+    /**
+     * PERF M3: Lightweight projection query for the problems list view.
+     *
+     * Only fetches the 8 columns needed for display — avoids loading
+     * problemJson, submittedCode, feedbackJson (TEXT columns, potentially
+     * 10-50 KB each). For 50 problems, this reduces DB transfer from
+     * ~500 KB–2.5 MB down to ~4 KB.
+     */
+    @Query("SELECT p.id, p.problemTitle, p.topic, p.difficulty, p.language, p.status, p.hintsUsed, p.createdAt " +
+           "FROM CodingProblem p WHERE p.user.id = :userId ORDER BY p.createdAt DESC")
+    Page<Object[]> findProblemSummariesByUserId(Long userId, Pageable pageable);
 }
+
