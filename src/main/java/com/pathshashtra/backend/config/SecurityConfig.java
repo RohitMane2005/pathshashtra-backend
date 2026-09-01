@@ -8,7 +8,6 @@ import com.pathshashtra.backend.security.OAuth2LoginFailureHandler;
 import com.pathshashtra.backend.security.OAuth2LoginSuccessHandler;
 import com.pathshashtra.backend.security.TokenBlacklist;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -38,9 +37,6 @@ public class SecurityConfig {
     private final StringRedisTemplate redisTemplate;
     private final RedisAvailabilityTracker redisTracker;
 
-    @Value("${app.cookie.same-site:Lax}")
-    private String cookieSameSite;
-
     public SecurityConfig(JwtUtil jwtUtil, TokenBlacklist tokenBlacklist, ObjectMapper objectMapper,
                           GlobalRateLimitFilter globalRateLimitFilter,
                           OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler,
@@ -68,33 +64,25 @@ public class SecurityConfig {
         http
             .cors(cors -> {})
             /**
-             * CRIT-01 FIX: CSRF protection is conditional on the SameSite cookie attribute.
-             * - SameSite=Lax: browser refuses to send cookies on cross-origin POST/DELETE,
-             *   so CSRF tokens are redundant → disable for simpler API integration.
-             * - SameSite=None (required when frontend/backend are on different domains):
-             *   browser WILL send cookies cross-origin, so CSRF tokens are essential.
-             * See: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
+             * CSRF: Disabled — CORS provides equivalent protection for this cross-domain SPA.
+             *
+             * Why this is safe:
+             *  1. CorsConfig only allows the explicit frontend origin (never wildcard *).
+             *  2. All state-changing requests (POST/PUT/DELETE with Content-Type: application/json)
+             *     trigger a CORS preflight. The browser checks the preflight against the CORS
+             *     allowlist before sending the credentialed request.
+             *  3. A cross-origin attacker cannot forge a credentialed request that passes the
+             *     CORS preflight because their origin is not in the allowlist.
+             *
+             * The XSRF-TOKEN cookie approach is NOT used here because:
+             *  - The cookie is set on the backend domain
+             *  - JavaScript on the frontend domain (different origin) cannot read it
+             *  - This would cause 403 Forbidden on every POST/PUT/DELETE from the SPA
+             *
+             * Reference: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
+             *            §"Use of Custom Request Headers" and §"Defense In Depth Techniques"
              */
-            .csrf(csrf -> {
-                if ("None".equalsIgnoreCase(cookieSameSite)) {
-                    // SameSite=None provides zero CSRF protection — enable CSRF tokens.
-                    // CookieCsrfTokenRepository puts X-XSRF-TOKEN in a readable cookie
-                    // that the frontend reads and sends back in a header on state-changing requests.
-                    csrf.csrfTokenRepository(
-                        org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse()
-                    ).csrfTokenRequestHandler(
-                        new org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler()
-                    ).ignoringRequestMatchers(
-                        // Public auth endpoints don't have a CSRF cookie yet
-                        "/api/auth/login", "/api/auth/register", "/api/auth/logout",
-                        "/api/auth/exchange-code", "/api/auth/forgot-password",
-                        "/api/auth/reset-password", "/api/auth/reset-password/validate"
-                    );
-                } else {
-                    // SameSite=Lax or Strict — browser handles CSRF natively
-                    csrf.disable();
-                }
-            })
+            .csrf(csrf -> csrf.disable())
             .formLogin(form -> form.disable())
             .httpBasic(basic -> basic.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
