@@ -1,6 +1,6 @@
 package com.pathshashtra.backend.config;
 
-import com.pathshashtra.backend.config.RedisAvailabilityTracker;
+// FIX-10: Removed redundant same-package import (RedisAvailabilityTracker is in the same package)
 import com.pathshashtra.backend.ratelimit.GlobalRateLimitFilter;
 import com.pathshashtra.backend.security.JwtAuthenticationFilter;
 import com.pathshashtra.backend.security.JwtUtil;
@@ -85,6 +85,19 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .formLogin(form -> form.disable())
             .httpBasic(basic -> basic.disable())
+            /**
+             * FIX-7: Session policy is deliberately IF_REQUIRED (not STATELESS).
+             *
+             * OAuth2 authorization code flow requires the server to store the `state` and
+             * PKCE verifier between the authorization redirect and the callback. Spring's
+             * HttpSessionOAuth2AuthorizationRequestRepository (configured below) uses the
+             * HTTP session for this — making STATELESS impossible for OAuth2 without a
+             * custom session-free repository (e.g., cookie-based or Redis-backed).
+             *
+             * Mitigation: sessions are created ONLY for OAuth2 requests (IF_REQUIRED).
+             * Normal JWT-cookie API calls never create a session. The session is destroyed
+             * after OAuth2LoginSuccessHandler runs (exchange code → set JWT cookie → done).
+             */
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
 
             // Security headers — HSTS, X-Frame-Options, X-Content-Type, Referrer-Policy, Permissions-Policy, CSP

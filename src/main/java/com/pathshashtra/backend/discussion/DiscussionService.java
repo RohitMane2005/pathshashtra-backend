@@ -12,9 +12,20 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class DiscussionService {
+
+    /**
+     * FIX-12: Allowlist of valid discussion tags — mirrors the frontend TAGS constant.
+     * Tags not in this set are silently stripped at the service layer so direct API
+     * callers cannot inject arbitrary tag strings.
+     */
+    private static final Set<String> ALLOWED_TAGS = Set.of(
+        "arrays", "dp", "trees", "graphs", "strings",
+        "career", "study", "help", "general"
+    );
 
     private final DiscussionPostRepository postRepo;
     private final DiscussionReplyRepository replyRepo;
@@ -71,8 +82,17 @@ public class DiscussionService {
         post.setAuthorName(user.getName());
         post.setTitle(htmlSanitizer.sanitize(title.trim(), 200));
         post.setContent(htmlSanitizer.sanitize(content.trim(), 10000));
-        // HIGH-03 FIX: Tags were the only user input not sanitized — XSS vector.
-        post.setTags(htmlSanitizer.sanitize(tags != null ? tags.trim().toLowerCase() : "", 200));
+        // FIX-12: Filter tags against ALLOWED_TAGS allowlist, then sanitize.
+        // Direct API callers could previously inject arbitrary tag strings.
+        String filteredTags = "";
+        if (tags != null && !tags.isBlank()) {
+            filteredTags = Arrays.stream(tags.split(","))
+                    .map(String::trim)
+                    .map(String::toLowerCase)
+                    .filter(ALLOWED_TAGS::contains)
+                    .collect(Collectors.joining(","));
+        }
+        post.setTags(htmlSanitizer.sanitize(filteredTags, 200));
         post.setCreatedAt(LocalDateTime.now());
         post.setUpdatedAt(LocalDateTime.now());
         return postRepo.save(post);

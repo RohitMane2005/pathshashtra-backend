@@ -135,33 +135,36 @@ public class CodingService {
      *
      * PERF M3: Uses projection query to avoid loading heavy TEXT columns
      * (problemJson, submittedCode, feedbackJson — potentially 10-50 KB each).
+     *
+     * FIX-9: Now uses type-safe CodingProblemSummary projection instead of
+     * raw Object[] index access. Compile-safe — query shape changes fail at startup.
      */
     @Transactional(readOnly = true)
     public Map<String, Object> getMyProblems(String email, Pageable pageable) {
         User user = getUser(email);
-        Page<Object[]> page = problemRepository
+        Page<CodingProblemSummary> page = problemRepository
                 .findProblemSummariesByUserId(user.getId(), pageable);
 
         List<Map<String, Object>> result = new ArrayList<>();
-        for (Object[] row : page.getContent()) {
+        for (CodingProblemSummary s : page.getContent()) {
             Map<String, Object> item = new HashMap<>();
-            item.put("id", row[0]);
-            item.put("title", row[1]);
-            item.put("topic", row[2]);
-            item.put("difficulty", row[3]);
-            item.put("language", row[4]);
-            item.put("status", row[5] != null ? row[5].toString() : null); // enum → String
-            item.put("hintsUsed", row[6]);
-            item.put("createdAt", row[7] != null ? row[7].toString() : null);
+            item.put("id",         s.getId());
+            item.put("title",      s.getProblemTitle());
+            item.put("topic",      s.getTopic());
+            item.put("difficulty", s.getDifficulty());
+            item.put("language",   s.getLanguage());
+            item.put("status",     s.getStatus() != null ? s.getStatus().name() : null);
+            item.put("hintsUsed",  s.getHintsUsed());
+            item.put("createdAt",  s.getCreatedAt() != null ? s.getCreatedAt().toString() : null);
             result.add(item);
         }
 
         Map<String, Object> response = new HashMap<>();
-        response.put("content", result);
+        response.put("content",       result);
         response.put("totalElements", page.getTotalElements());
-        response.put("totalPages", page.getTotalPages());
-        response.put("number", page.getNumber());
-        response.put("size", page.getSize());
+        response.put("totalPages",    page.getTotalPages());
+        response.put("number",        page.getNumber());
+        response.put("size",          page.getSize());
         return response;
     }
 

@@ -73,6 +73,15 @@ public class AuthService {
             return null;
         }
 
+        // FIX-2: Always run bcrypt FIRST for every found user, regardless of the reason
+        // we'll reject them (deleted, OAuth-only, wrong password). This ensures all failure
+        // paths take ~300ms (bcrypt rounds), preventing timing-based user enumeration:
+        //   OLD: deleted account returned instantly → attacker could detect deleted users
+        //   OLD: OAuth user returned instantly     → attacker could detect OAuth-only users
+        //   NEW: all paths through bcrypt → indistinguishable response time
+        String storedHash = user.getPassword() != null ? user.getPassword() : DUMMY_BCRYPT_HASH;
+        boolean passwordMatches = passwordEncoder.matches(request.getPassword(), storedHash);
+
         // Soft-deleted account — generic failure (don't reveal account existed)
         if (user.getDeletedAt() != null) {
             return null;
@@ -84,7 +93,7 @@ public class AuthService {
         }
 
         // Password mismatch — generic failure
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (!passwordMatches) {
             return null;
         }
 

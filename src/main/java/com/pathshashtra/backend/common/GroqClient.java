@@ -54,10 +54,20 @@ public class GroqClient {
     /**
      * Call Groq API with a prompt. Returns raw text response.
      *
-     * M-06 FIX: Retries up to 2 times with exponential backoff on transient failures.
-     * Groq frequently returns 5xx under load — immediate failure loses user context.
+     * FIX-5 (retry): Retries up to 2 times with exponential backoff + jitter.
+     * Jitter (±25%) prevents thundering herd when multiple concurrent requests
+     * fail simultaneously and all retry at the same interval.
      *
-     * @param prompt    user prompt
+     * ⚠ BLOCKING: Thread.sleep() runs on the calling servlet thread.
+     * Max block time per call = 60s (read timeout) × 3 attempts + 1s + 2s backoff
+     * = ~185s worst case. Tomcat default pool is 200 threads — size accordingly
+     * (e.g., max-threads: 50 for AI endpoints + separate thread pool for others).
+     *
+     * Context management contract: this method is single-turn only (user prompt → response).
+     * Multi-turn chat history MUST be stitched together by the caller (e.g., ChatService)
+     * before passing a single combined prompt string. FIX-13: documented here explicitly.
+     *
+     * @param prompt    user prompt (include conversation history for multi-turn)
      * @param maxTokens response token limit
      */
     public String call(String prompt, int maxTokens) {
@@ -66,8 +76,13 @@ public class GroqClient {
         for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
             try {
                 if (attempt > 0) {
-                    long backoffMs = 1000L * (1L << (attempt - 1)); // 1s, 2s
-                    log.warn("Groq API retry {}/{}, backing off {}ms", attempt, MAX_RETRIES, backoffMs);
+                    // FIX-5: Exponential backoff with ±25% jitter to prevent thundering herd.
+                    // Base: 1s (attempt 1), 2s (attempt 2). Jitter range: ×0.75–1.25.
+                    long baseMs = 1000L * (1L << (attempt - 1));
+                    long jitter  = (long) (baseMs * 0.25 * (Math.random() * 2 - 1)); // ±25%
+                    long backoffMs = Math.max(100, baseMs + jitter);
+                    log.warn("Groq API retry {}/{}, backing off {}ms (base={}ms, jitter={}ms)",
+                            attempt, MAX_RETRIES, backoffMs, baseMs, jitter);
                     Thread.sleep(backoffMs);
                 }
 

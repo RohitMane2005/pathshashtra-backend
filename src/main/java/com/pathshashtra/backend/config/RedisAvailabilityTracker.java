@@ -90,8 +90,14 @@ public class RedisAvailabilityTracker {
 
     private boolean ping() {
         try {
-            String result = redisTemplate.getConnectionFactory().getConnection().ping();
-            return "PONG".equalsIgnoreCase(result);
+            // FIX-1: Use execute(RedisCallback) so Spring manages the connection lifecycle
+            // and returns it to the pool after use. The old pattern (getConnection().ping()
+            // without close()) leaked one connection per call — exhausting the pool over time.
+            Boolean pong = redisTemplate.execute(
+                (org.springframework.data.redis.core.RedisCallback<Boolean>) conn ->
+                    "PONG".equalsIgnoreCase(conn.ping())
+            );
+            return Boolean.TRUE.equals(pong);
         } catch (Exception e) {
             return false;
         }

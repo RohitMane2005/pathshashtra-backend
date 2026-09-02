@@ -27,6 +27,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Handles permanent account deletion with cascading cleanup of all user data.
@@ -164,19 +166,34 @@ public class AccountDeletionService {
 
         userRepository.delete(user);
 
-        // HIGH-01 FIX: Invalidate all active JWTs for this user.
-        // Uses the same pwd_changed: pattern checked by JwtAuthenticationFilter.
-        // Any JWT issued before this timestamp will be rejected, preventing
-        // deleted users from making API calls with still-valid cookies.
-        try {
-            String pwdChangeKey = "pwd_changed:" + email;
-            redisTemplate.opsForValue().set(pwdChangeKey,
-                    String.valueOf(System.currentTimeMillis()),
-                    86400, java.util.concurrent.TimeUnit.SECONDS);
-        } catch (Exception e) {
-            log.warn("Redis unavailable during account deletion session invalidation: {}", e.getMessage());
-        }
+        log.info("[AUDIT] Account permanently deleted for userId={}", userId);
 
-        log.info("[AUDIT] Account permanently deleted for userId={}, all tokens invalidated", userId);
+        // FIX-3: Moved Redis JWT invalidation OUTSIDE the @Transactional boundary using
+        // TransactionSynchronizationManager.afterCommit().
+        //
+        // OLD problem: if the DB transaction rolled back after Redis was written
+        // (e.g., a FK constraint failure mid-deletion), the user's JWTs were
+        // invalidated even though their account was NOT deleted — leaving them
+        // locked out of a still-existing account with no way to log back in.
+        //
+        // NEW: Redis is only written after the DB commit succeeds. If Redis is
+        // unavailable at that point, we log a warning but don't throw — the
+        // account is deleted and the token will expire naturally.
+        final String emailFinal = email;
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    String pwdChangeKey = "pwd_changed:" + emailFinal;
+                    redisTemplate.opsForValue().set(pwdChangeKey,
+                            String.valueOf(System.currentTimeMillis()),
+                            86400, java.util.concurrent.TimeUnit.SECONDS);
+                    log.info("[AUDIT] All tokens invalidated for deleted userId={}", userId);
+                } catch (Exception e) {
+                    log.warn("Redis unavailable during account deletion token invalidation: {}. "
+                            + "Existing tokens will expire naturally.", e.getMessage());
+                }
+            }
+        });
     }
 }

@@ -100,11 +100,20 @@ public class RateLimiter {
     // ── Utility ───────────────────────────────────────────────────────────────
 
     /**
-     * Generic rate-limit check with custom prefix, identifier, and limit.
-     * Used by ChatController and similar ad-hoc rate-limiting.
+     * Generic rate-limit check with custom prefix, identifier, limit, and window.
+     * FIX-8: windowSeconds is now a required parameter — the old hardcoded 24h window
+     * was wrong for any caller needing per-minute or per-hour limits.
+     */
+    public boolean allowRequest(String prefix, String identifier, int limit, long windowSeconds) {
+        return redis.isAllowed(prefix + identifier, limit, windowSeconds);
+    }
+
+    /**
+     * Backward-compat overload defaulting to a 24-hour window.
+     * Prefer the explicit 4-arg overload for new callers.
      */
     public boolean allowRequest(String prefix, String identifier, int limit) {
-        return redis.isAllowed(prefix + identifier, limit, 86400);
+        return allowRequest(prefix, identifier, limit, 86400);
     }
 
     /** Returns remaining quota as int for header/response use */
