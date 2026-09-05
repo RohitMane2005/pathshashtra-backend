@@ -139,6 +139,8 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/quiz/share/**").permitAll()
                     .requestMatchers("/login/oauth2/**", "/oauth2/**").permitAll()
+                    // Razorpay webhook — no user auth, signature verified inside service
+                    .requestMatchers(HttpMethod.POST, "/api/subscription/webhook").permitAll()
                     // FIX D3: removed /actuator/health from public access — use /api/health instead
                     .anyRequest().authenticated()
             )

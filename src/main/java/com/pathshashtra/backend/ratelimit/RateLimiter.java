@@ -43,47 +43,60 @@ public class RateLimiter {
         return redis.isAllowed("pwreset:" + email, 3, 3600);
     }
 
-    // ── AI endpoints ─────────────────────────────────────────────────────────
+    // ── AI endpoints (Free / Pro tiers) ─────────────────────────────────────
+    //
+    // Free limits are conservative; Pro limits are effectively unlimited (10000).
+    // Each method has a convenience overload that defaults to Free.
 
-    /** 20 coding problems per user per day */
-    public boolean allowCodingGenerate(String email) {
-        return redis.isAllowed("ai_coding:" + email, 20, 86400);
-    }
+    private static final int PRO_LIMIT = 10000;
 
-    /** 3 quiz sessions per user per day */
-    public boolean allowQuizGenerate(String email) {
-        return redis.isAllowed("ai_quiz:" + email, 3, 86400);
+    /** Free: 20/day — Pro: unlimited */
+    public boolean allowCodingGenerate(String email, boolean isPro) {
+        return redis.isAllowed("ai_coding:" + email, isPro ? PRO_LIMIT : 20, 86400);
     }
+    public boolean allowCodingGenerate(String email) { return allowCodingGenerate(email, false); }
 
-    /** 5 roadmap generations per user per day */
-    public boolean allowRoadmapGenerate(String email) {
-        return redis.isAllowed("ai_roadmap:" + email, 5, 86400);
+    /** Free: 3/day — Pro: unlimited */
+    public boolean allowQuizGenerate(String email, boolean isPro) {
+        return redis.isAllowed("ai_quiz:" + email, isPro ? PRO_LIMIT : 3, 86400);
     }
+    public boolean allowQuizGenerate(String email) { return allowQuizGenerate(email, false); }
 
-    /** 3 career assessments per user per day */
-    public boolean allowCareerAssessment(String email) {
-        return redis.isAllowed("ai_career:" + email, 3, 86400);
+    /** Free: 3/day — Pro: unlimited */
+    public boolean allowRoadmapGenerate(String email, boolean isPro) {
+        return redis.isAllowed("ai_roadmap:" + email, isPro ? PRO_LIMIT : 3, 86400);
     }
+    public boolean allowRoadmapGenerate(String email) { return allowRoadmapGenerate(email, false); }
 
-    /** 30 coding hints per user per day */
-    public boolean allowCodingHint(String email) {
-        return redis.isAllowed("ai_coding_hint:" + email, 30, 86400);
+    /** Free: 3/day — Pro: unlimited */
+    public boolean allowCareerAssessment(String email, boolean isPro) {
+        return redis.isAllowed("ai_career:" + email, isPro ? PRO_LIMIT : 3, 86400);
     }
+    public boolean allowCareerAssessment(String email) { return allowCareerAssessment(email, false); }
 
-    /** 30 coding submissions per user per day */
-    public boolean allowCodingSubmit(String email) {
-        return redis.isAllowed("ai_coding_submit:" + email, 30, 86400);
+    /** Free: 30/day — Pro: unlimited */
+    public boolean allowCodingHint(String email, boolean isPro) {
+        return redis.isAllowed("ai_coding_hint:" + email, isPro ? PRO_LIMIT : 30, 86400);
     }
+    public boolean allowCodingHint(String email) { return allowCodingHint(email, false); }
 
-    /** 3 study plan generations per user per day */
-    public boolean allowStudyPlanGenerate(String email) {
-        return redis.isAllowed("ai_study:" + email, 3, 86400);
+    /** Free: 30/day — Pro: unlimited */
+    public boolean allowCodingSubmit(String email, boolean isPro) {
+        return redis.isAllowed("ai_coding_submit:" + email, isPro ? PRO_LIMIT : 30, 86400);
     }
+    public boolean allowCodingSubmit(String email) { return allowCodingSubmit(email, false); }
 
-    /** 30 chat messages per user per hour */
-    public boolean allowChatMessage(String email) {
-        return redis.isAllowed("chat:" + email, 30, 3600);
+    /** Free: 3/day — Pro: unlimited */
+    public boolean allowStudyPlanGenerate(String email, boolean isPro) {
+        return redis.isAllowed("ai_study:" + email, isPro ? PRO_LIMIT : 3, 86400);
     }
+    public boolean allowStudyPlanGenerate(String email) { return allowStudyPlanGenerate(email, false); }
+
+    /** Free: 15/day — Pro: unlimited */
+    public boolean allowChatMessage(String email, boolean isPro) {
+        return redis.isAllowed("chat:" + email, isPro ? PRO_LIMIT : 15, 86400);
+    }
+    public boolean allowChatMessage(String email) { return allowChatMessage(email, false); }
 
     // ── Social / content endpoints ────────────────────────────────────────────
 

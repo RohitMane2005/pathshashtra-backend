@@ -153,6 +153,13 @@
 			<version>0.1.5</version>
 		</dependency>
 
+		<!-- Razorpay payment gateway SDK -->
+		<dependency>
+			<groupId>com.razorpay</groupId>
+			<artifactId>razorpay-java</artifactId>
+			<version>1.4.5</version>
+		</dependency>
+
 		<!-- H2 database (local development only — runtime-scoped to exclude from test classpath) -->
 		<dependency>
 			<groupId>com.h2database</groupId>

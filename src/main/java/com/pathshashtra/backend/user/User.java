@@ -32,6 +32,9 @@ public class User {
 
     private String authProvider = "LOCAL";
 
+    /** Subscription plan: FREE (default) or PRO. */
+    private String plan = "FREE";
+
     /** Soft-delete timestamp. Null = active account. */
     private LocalDateTime deletedAt;
 }
