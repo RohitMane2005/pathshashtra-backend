@@ -180,6 +180,13 @@ public class SubscriptionService {
      */
     @Transactional
     public void handleWebhook(String payload, String webhookSecret, String receivedSignature) {
+        // FIX: Reject webhooks when secret is not configured — an empty-key HMAC
+        // would be trivially forgeable, allowing anyone to cancel subscriptions.
+        if (webhookSecret == null || webhookSecret.isBlank()) {
+            log.warn("Razorpay webhook received but RAZORPAY_WEBHOOK_SECRET is not configured — ignoring");
+            return;
+        }
+
         // Verify webhook signature: HMAC-SHA256(payload, webhookSecret)
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -201,8 +208,11 @@ public class SubscriptionService {
 
         // Handle subscription cancellation from Razorpay dashboard
         if ("subscription.cancelled".equals(eventName) || "subscription.expired".equals(eventName)) {
-            JSONObject subObj = event.optJSONObject("payload")
-                    .optJSONObject("subscription").optJSONObject("entity");
+            // FIX: Null-safe chaining — any missing nested key returns null instead of NPE
+            JSONObject payloadObj = event.optJSONObject("payload");
+            JSONObject subscriptionObj = payloadObj != null ? payloadObj.optJSONObject("subscription") : null;
+            JSONObject subObj = subscriptionObj != null ? subscriptionObj.optJSONObject("entity") : null;
+
             if (subObj != null) {
                 String subId = subObj.optString("id");
                 subscriptionRepo.findByRazorpaySubscriptionId(subId).ifPresent(sub -> {
@@ -213,6 +223,8 @@ public class SubscriptionService {
                     userRepo.save(u);
                     log.info("User {} reverted to FREE via webhook ({})", u.getEmail(), eventName);
                 });
+            } else {
+                log.warn("Webhook event {} has malformed payload structure — missing subscription entity", eventName);
             }
         }
     }

@@ -60,6 +60,18 @@ public class CodingController {
                 .body(codingService.submitCode(email, request));
     }
 
+    @PostMapping("/run")
+    public ResponseEntity<?> runCode(@Valid @RequestBody CodeRunRequest request, Authentication auth) {
+        String email = auth.getName();
+        if (!rateLimiter.allowCodingRun(email)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "Daily run limit reached (50/day)."));
+        }
+        return ResponseEntity.ok()
+                .header("X-RateLimit-Remaining", String.valueOf(rateLimiter.remaining("ai_coding_run:", email, 50)))
+                .body(codingService.runCode(email, request));
+    }
+
     @GetMapping("/problem/{id}")
     public ResponseEntity<?> getProblem(@PathVariable Long id, Authentication auth) {
         return ResponseEntity.ok(codingService.getProblemById(auth.getName(), id));

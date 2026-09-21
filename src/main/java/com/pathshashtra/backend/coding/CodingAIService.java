@@ -160,6 +160,62 @@ public class CodingAIService {
     return groqClient.call(prompt, 2000);
   }
 
+  /**
+   * Run/simulate student code against the problem's example test cases.
+   * Returns test case pass/fail details, actual output, errors, runtime and memory stats.
+   */
+  public String runCode(String problemJson, String submittedCode, String language) {
+    String safeProblem = sanitize(problemJson, 4000);
+    String safeCode = sanitizeCode(submittedCode, 15000);
+    String safeLang = sanitize(language);
+    String prompt = """
+        You are an automated code execution engine and test runner.
+
+        Problem:
+        %s
+
+        Language: %s
+        Student's Code:
+        %s
+
+        Task:
+        Simulate running this code against each example test case specified in the problem statement.
+        Carefully trace code execution line-by-line.
+        Check for:
+        1. Syntax or compilation errors.
+        2. Runtime errors (e.g. index out of bounds, null pointer, division by zero, recursion limit).
+        3. Incorrect output / failed assertions.
+        4. Infinite loops (Time Limit Exceeded).
+
+        Respond ONLY with valid JSON, no markdown fences or extra text:
+        {
+          "status": "ACCEPTED",
+          "passed": true,
+          "totalTestCases": 2,
+          "passedTestCases": 2,
+          "runtime": "15ms",
+          "memory": "38.2 MB",
+          "output": "Console output if any",
+          "error": null,
+          "testCases": [
+            {
+              "caseNumber": 1,
+              "input": "example input",
+              "expectedOutput": "expected output",
+              "actualOutput": "actual output from student code",
+              "passed": true,
+              "explanation": "why this test case passed or failed"
+            }
+          ]
+        }
+
+        Note: "status" MUST be one of: "ACCEPTED", "WRONG_ANSWER", "COMPILATION_ERROR", "RUNTIME_ERROR", "TIME_LIMIT_EXCEEDED".
+        If there is a compilation error or runtime error, set "status" accordingly, set "passed": false, and describe the exact error in "error".
+        """.formatted(safeProblem, safeLang, safeCode);
+
+    return groqClient.call(prompt, 1500);
+  }
+
   @Cacheable(value = "dsa-roadmap", key = "#currentLevel + ':' + #targetGoal")
   public String generateRoadmap(String studentName, String currentLevel, String targetGoal) {
     studentName = sanitize(studentName);

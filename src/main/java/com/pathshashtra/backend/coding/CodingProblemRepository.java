@@ -32,8 +32,10 @@ public interface CodingProblemRepository extends JpaRepository<CodingProblem, Lo
      * instead of Page<Object[]> (unsafe index access). Spring Data JPA maps each
      * getter to the corresponding SELECT column. Query shape changes fail at startup.
      */
-    @Query("SELECT p.id, p.problemTitle, p.topic, p.difficulty, p.language, p.status, p.hintsUsed, p.createdAt " +
-           "FROM CodingProblem p WHERE p.user.id = :userId ORDER BY p.createdAt DESC")
+    @Query(value = "SELECT new com.pathshashtra.backend.coding.CodingProblemSummary(" +
+                   "p.id, p.problemTitle, p.topic, p.difficulty, p.language, p.status, p.hintsUsed, p.createdAt) " +
+           "FROM CodingProblem p WHERE p.user.id = :userId ORDER BY p.createdAt DESC",
+           countQuery = "SELECT COUNT(p) FROM CodingProblem p WHERE p.user.id = :userId")
     Page<CodingProblemSummary> findProblemSummariesByUserId(Long userId, Pageable pageable);
 }
 

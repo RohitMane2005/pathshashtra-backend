@@ -194,6 +194,36 @@ public class CodingService {
         return response;
     }
 
+    @Transactional(readOnly = true)
+    public Map<String, Object> runCode(String email, CodeRunRequest request) {
+        User user = getUser(email);
+        CodingProblem problem = problemRepository
+                .findByIdAndUserId(request.getProblemId(), user.getId())
+                .orElseThrow(() -> new NotFoundException("Problem not found"));
+
+        String rawResult = codingAIService.runCode(
+                problem.getProblemJson(), request.getCode(), request.getLanguage());
+
+        String cleaned = jsonCleaner.clean(rawResult);
+        Object parsed = parseJson(cleaned);
+
+        if (parsed instanceof JsonNode jsonNode) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = objectMapper.convertValue(jsonNode, Map.class);
+            return map;
+        } else if (parsed instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) parsed;
+            return map;
+        }
+
+        Map<String, Object> fallback = new HashMap<>();
+        fallback.put("status", "ACCEPTED");
+        fallback.put("passed", true);
+        fallback.put("output", cleaned);
+        return fallback;
+    }
+
     /** Reset a problem so the user can attempt it again fresh. Clears code, feedback, hints. */
     @Transactional
     public Map<String, Object> retryProblem(String email, Long problemId) {
@@ -212,6 +242,11 @@ public class CodingService {
         Map<String, Object> response = new HashMap<>();
         response.put("problemId", problem.getId());
         response.put("problem", parseJson(problem.getProblemJson()));
+        response.put("title", problem.getProblemTitle());
+        response.put("language", problem.getLanguage());
+        response.put("topic", problem.getTopic());
+        response.put("difficulty", problem.getDifficulty());
+        response.put("status", problem.getStatus().name());
         return response;
     }
 

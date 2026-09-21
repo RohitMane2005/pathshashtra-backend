@@ -1,15 +1,18 @@
 package com.pathshashtra.backend.subscription;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
 
 import java.util.Optional;
 
 public interface SubscriptionRepository extends JpaRepository<Subscription, Long> {
 
-    /** Most recent active subscription for a user. */
-    @Query("SELECT s FROM Subscription s WHERE s.user.id = :userId AND s.status = 'ACTIVE' ORDER BY s.createdAt DESC")
-    Optional<Subscription> findActiveByUserId(Long userId);
+    /** Most recent active subscription for a user (LIMIT 1 via Spring Data naming). */
+    Optional<Subscription> findFirstByUserIdAndStatusOrderByCreatedAtDesc(Long userId, String status);
+
+    /** Convenience wrapper that callers use — always queries for 'ACTIVE'. */
+    default Optional<Subscription> findActiveByUserId(Long userId) {
+        return findFirstByUserIdAndStatusOrderByCreatedAtDesc(userId, "ACTIVE");
+    }
 
     /** Look up by Razorpay subscription ID (for webhook events). */
     Optional<Subscription> findByRazorpaySubscriptionId(String razorpaySubscriptionId);

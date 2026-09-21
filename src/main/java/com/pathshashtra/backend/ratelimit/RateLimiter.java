@@ -86,6 +86,12 @@ public class RateLimiter {
     }
     public boolean allowCodingSubmit(String email) { return allowCodingSubmit(email, false); }
 
+    /** Free: 50/day — Pro: unlimited */
+    public boolean allowCodingRun(String email, boolean isPro) {
+        return redis.isAllowed("ai_coding_run:" + email, isPro ? PRO_LIMIT : 50, 86400);
+    }
+    public boolean allowCodingRun(String email) { return allowCodingRun(email, false); }
+
     /** Free: 3/day — Pro: unlimited */
     public boolean allowStudyPlanGenerate(String email, boolean isPro) {
         return redis.isAllowed("ai_study:" + email, isPro ? PRO_LIMIT : 3, 86400);
