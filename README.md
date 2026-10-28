@@ -178,7 +178,7 @@ The frontend repository is configured through the REACT_APP_API_URL environment 
 
 For local development, the frontend example uses:
 
-REACT_APP_API_URL=http://localhost:8080/api
+REACT_APP_API_URL=https://pathshashtra.vercel.app/
 
 Ensure that:
 
